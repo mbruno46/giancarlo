@@ -2,8 +2,8 @@ from itertools import permutations
 from .utils import default, log
 
 class Contraction:
-    def __init__(self, fields):
-        self.pairs = []
+    def __init__(self, fields, pairs = []):
+        self.pairs = pairs
         self._tag = None
         self.fields = fields
         
@@ -55,6 +55,7 @@ def wick_fields(expr):
             else:
                 _c.append(pi)
                 _c.append(pj)
+                break
 
         # checks for left-over uncontracted fields
         if _c.fully_contracted:
@@ -62,13 +63,45 @@ def wick_fields(expr):
                 stack.append(_c.tag)
                 contractions.append(_c)
         
-                ip += 1
-                if 'wick' in default.debug:
-                    log.debug(f'{ip} / {len(idx)}')
+            ip += 1
+            if 'wick' in default.debug:
+                log.debug(f'{ip} / {len(idx)}')
 
     return contractions
 
-    
+
+def wick_fields_fast(expr):
+    contractions = []
+    stack = []
+
+    def backtrack(remaining, paired):
+        if not remaining:
+            _c = Contraction(expr.factors, list(paired))
+            if _c.fully_contracted:
+                if _c.tag not in stack:
+                    stack.append(_c.tag)
+                    contractions.append(_c)
+            return 
+        
+        for j in range(len(remaining)):
+            f0 = remaining[j]
+
+            for i in range(len(remaining)):
+                if i==j:
+                    continue
+                f1 = remaining[i]
+
+                if f0.can_be_contracted(f1):
+                    i0 = expr.factors.index(f0)
+                    i1 = expr.factors.index(f1)
+                    paired.append((i0,i1))
+
+                    backtrack([f for f in remaining if f not in (f0, f1)], paired)
+                    paired.pop()
+
+    backtrack(expr.factors, [])
+    return contractions
+
 def build_trace(expr, Trace_class, indices):
     if not indices:
         return expr.factors

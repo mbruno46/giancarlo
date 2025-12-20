@@ -2,6 +2,7 @@ from copy import deepcopy
 
 from .utils import default, log
 from .wick import *
+from .draw import *
 
 __all__ = [
     "Base",
@@ -52,6 +53,12 @@ class Base:
     def istype(self, ftype):
         return False
     
+    def __getitem__(self, idx):
+        return self.factors[idx]
+    
+    def draw(self):
+        pass
+
 class Product(Base):    
     def __init__(self, factors = []):
         self.factors = factors
@@ -84,7 +91,7 @@ class Product(Base):
         prefactor, fields = self.simplify(split=True)
 
         terms = []
-        for c in wick_fields(fields):
+        for c in wick_fields_fast(fields):
             if 'wick' in default.debug:
                 log.debug(f' wick : {c}')
             tr = build_trace(Product(c()), Trace, trace_indices)
@@ -92,6 +99,17 @@ class Product(Base):
         
         return Sum(terms)
     
+    def draw(self):
+        loops = []
+        for f in self.factors:
+            if type(f) is Trace:
+                loops += [f]
+        
+        g = Graph(len(loops))
+        for l in loops:
+            g.draw_loop(l, loops.index(l))
+        g(self._repr_latex_())
+
 class Sum(Base):
     def __init__(self, factors):
        self.factors = []
@@ -137,6 +155,9 @@ class Sum(Base):
         for f in self.factors:
             yield f
 
+    def draw(self):
+        for f in self.factors:
+            f.draw()
 
 class Trace(Base):
     def __init__(self, indices: list):

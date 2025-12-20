@@ -4,12 +4,13 @@ from .algebra import *
 from .qft import *
 from .utils import *
 from .manipulate import *
+from .draw import *
 
 __all__.extend(algebra.__all__)
 __all__.extend(qft.__all__)
 __all__.extend(utils.__all__)
 __all__.extend(manipulate.__all__)
-
+__all__.extend(draw.__all__)
 
 def ScalarField(flavor):
     id = default.new()
@@ -27,6 +28,6 @@ def SpinorField(flavor):
         return Field(id, rf'\bar{{{flavor}}}', True, {'pos': pos, 'spin': spin})
     return psi, psibar
 
-def DiracGamma(mu, a, b):
+def DiracGamma(mu, a, b, ):
     id = default.new()
     return Field(id, 'G', False, {'lorentz': mu, 'spin': a}) * Field(id, 'G', True, {'lorentz': mu, 'spin': b})
