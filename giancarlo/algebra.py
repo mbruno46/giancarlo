@@ -1,4 +1,5 @@
 from copy import deepcopy
+import math
 
 from .utils import default, log
 from .wick import *
@@ -6,6 +7,8 @@ from .draw import *
 
 __all__ = [
     "Base",
+    "CNumber",
+    "Symbol"
 ]
 
 class Base:        
@@ -59,9 +62,15 @@ class Base:
     def draw(self):
         pass
 
-class Product(Base):    
+
+class Product(Base):
     def __init__(self, factors = []):
-        self.factors = factors
+        self.factors = []
+        for f in factors:
+            if isinstance(f, Product):
+                self.factors.extend(f.factors)
+            else:
+                self.factors.append(f)
 
     @property
     def size(self):
@@ -73,19 +82,23 @@ class Product(Base):
         return " * ".join(map(str, self.factors))
     
     def simplify(self, split=False):
-        def collect(ftype):
-            return [f for f in self.factors if f.istype(ftype)]
-        c = Product(collect('cnumber'))
-        if c.size>1:
-            c = c.factors[0].reduce(c.factors)
-        s = Product(collect('symbol'))
-        if s.size>1:
-            s = s.factors[0].reduce(s.factors)
-        prefactor = c * s
-        fields = Product([f for f in self.factors if not (f.istype('cnumber') or f.istype('symbol'))])
+        cs = []
+        ss = []
+        rs = []
+        for f in self.factors:
+            if isinstance(f, CNumber):
+                cs.append(f)
+            elif isinstance(f, Symbol):
+                ss.append(f)
+            else:
+                rs.append(f)
+        
+        prefactor = CNumber.reduce(cs) * Symbol.reduce(ss)
+        other = Product(rs)
+
         if split:
-            return prefactor, fields
-        return prefactor * fields
+            return prefactor, other
+        return prefactor * other
     
     def wick(self, trace_indices = [], **kwargs):
         prefactor, fields = self.simplify(split=True)
@@ -100,25 +113,34 @@ class Product(Base):
         return Sum(terms)
     
     def draw(self):
-        loops = []
-        for f in self.factors:
-            if type(f) is Trace:
-                loops += [f]
-        
-        g = Graph(len(loops))
-        for l in loops:
-            g.draw_loop(l, loops.index(l))
+        # remove prefactors
+        _data = [f for f in self.factors if not isinstance(f, (Sum, CNumber, Symbol))]
+        # remove traces
+        _no_traces = []
+        for f in _data:
+            if isinstance(f, Trace):
+                _no_traces.extend(f.factors)
+            else:
+                _no_traces.append(f)
+        # keep only propagators
+        _props = [p for p in _no_traces if p['pos']!=(None,None)]
+        print('quaa ', _props)
+        connected = build_trace(Product(_props), Trace, indices=['pos'])
+
+        g = Graph(len(connected))
+        for conn in connected:
+            g.draw_connected_diagram(conn.factors)
         g(self._repr_latex_())
 
 class Sum(Base):
-    def __init__(self, factors):
-       self.factors = []
-       for f in factors:
+    def __init__(self, factors = []):
+        self.factors = []
+        for f in factors:
             if isinstance(f, Sum):
                 self.factors.extend(f.factors)
             else:
                 self.factors.append(f)
-                
+
     def __str__(self):
         return f"( {' + '.join(map(str, self.factors))} )"
 
@@ -172,13 +194,72 @@ class Trace(Base):
         tag = ' '.join(rf'\mathrm{{Tr}}_\mathrm{{{idx}}}' for idx in self.indices if idx!='pos')
         return f'{tag} [ {Product(self.factors)} ]'
 
-    def cyclic(self):
-        def scroll(lst, n):
-            n = n % len(lst)
-            return lst[-n:] + lst[:-n]
+    # checks that trace effectively is closed, otherwise returns product
+    def __call__(self):
+        indices0 = [self.factors[0].fx[idx] for idx in self.indices]
+        indices1 = [self.factors[-1].fy[idx] for idx in self.indices]
+        if indices0 == indices1:
+            return self
+        return Product(self.factors)
+    
+    # def cyclic(self):
+    #     def scroll(lst, n):
+    #         n = n % len(lst)
+    #         return lst[-n:] + lst[:-n]
 
-        for i in range(len(self.factors)):
-            t = Trace(self.index)
-            t.factors = scroll(self.factors, i)
-            yield t
+    #     for i in range(len(self.factors)):
+    #         t = Trace(self.index)
+    #         t.factors = scroll(self.factors, i)
+    #         yield t
 
+    # def draw(self, g):
+    #     lines = [f for f in self.factors if f.tag[0] == 'S']
+    #     if len(lines)==1:
+    #         g.draw_tadpole(lines[0].fx['pos'])
+    #     else:
+    #         loop = g.new_loop()
+    #         for f in self.factors:
+    #             if f.tag[0] == 'S': # it's a propagator
+    #                 loop.add_line(f.fx['pos'], f.fy['pos'])
+    #         loop()
+    #     return
+
+class CNumber(Base):
+    def __init__(self, value):
+        self.value = value
+
+    def __str__(self):
+        return f'{self.value}'
+
+    def reduce(cnumbers: list) -> Product:
+        if not cnumbers:
+            return Product()
+        return Product([CNumber(math.prod([c.value for c in cnumbers]))])
+
+
+class Symbol(Base):
+    def __init__(self, value: str, pow: int = 1):
+        self.value = value
+        self.pow = pow
+        
+    def __str__(self):
+        return self.value + (f'^{self.pow}' if self.pow>1 else '')
+
+    def reduce(symbols: list) -> Product:
+        if not symbols:
+            return Product()
+        
+        vals = [s.value for s in symbols]
+        pows = [s.pow for s in symbols]
+
+        _vals = []
+        _pows = []
+        for v, p in zip(vals, pows):
+            if v not in _vals:
+                _vals.append(v)
+                _pows.append(p)
+            else:
+                i = _vals.index(v)
+                _pows[i] += p
+
+        return Product([Symbol(_v,_p) for _v, _p in zip(_vals, _pows)])

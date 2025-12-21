@@ -123,6 +123,4 @@ def build_trace(expr, Trace_class, indices):
             traces += [Trace_class(indices)]
             DFS([f[idx][0] for idx in indices])
 
-    return traces
-        
-    
+    return [t() for t in traces]
