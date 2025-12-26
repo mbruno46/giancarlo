@@ -6,7 +6,6 @@ It provides tools to represent and manipulate creation and annihilation operator
 
 **License:** GPL-3.0 ([LICENSE](https://github.com/mbruno46/giancarlo/blob/main/LICENSE))
 
----
 
 ## Features
 
@@ -15,7 +14,6 @@ It provides tools to represent and manipulate creation and annihilation operator
 - Simplification of operator products
 - Designed for quantum field theory and many-body physics applications
 
----
 
 ## Installation
 
@@ -27,7 +25,6 @@ pip install -e .
 
 This installs the library in editable mode for development.
 
----
 
 ## Tutorials
 
@@ -40,7 +37,6 @@ The repository contains a `tutorials/` folder with notebooks demonstrating:
 
 These serve as practical examples for learning the library.
 
----
 
 ## Citation
 
