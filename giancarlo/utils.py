@@ -1,6 +1,8 @@
+import math
+
 __all__ = [
     "default",
-    "log",
+    "log"
 ]
 
 def inside_ipython():
@@ -18,7 +20,7 @@ class default:
         'spin': False,
         'lorentz': True
     }
-    debug = ['wick', 'simplify']
+    debug = [] #'wick', 'simplify']
     latex = inside_ipython()
 
     @classmethod
@@ -44,5 +46,5 @@ class Log:
 
     def __call__(self, x):
         self.caller(x)
-        
+
 log = Log()

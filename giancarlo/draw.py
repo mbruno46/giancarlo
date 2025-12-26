@@ -1,11 +1,14 @@
 import matplotlib.pyplot as plt
 from matplotlib.patches import FancyArrowPatch, Circle
+plt.rcParams.update({
+    'font.size': 14
+})
 
 import math
 
 __all__ = [
-    "Graph",
-    "GraphInfo"
+    "Diagram",
+    "PlotStyle"
 ]
 
 def fill_points_circle(d: dict, radius=1.0, center=(0.0, 0.0)):
@@ -21,19 +24,26 @@ def fill_points_circle(d: dict, radius=1.0, center=(0.0, 0.0)):
     return
 
 
-class GraphInfo:
-    points = {
-        'default': {
-            'c': 'C0'
-        }
-    }
+class PlotStyle:
+    points = {}
     linestyles = {
         'default': '-',
     }
+    style = 'default'
 
-class Graph:
+    @staticmethod
+    def point(color='C0', size=80):
+        return {'c': color, 's': size}
+
+PlotStyle.points['default'] = PlotStyle.point()
+
+class Diagram:
     def __init__(self, nconn):
-        self.fig, self.ax = plt.subplots()
+        plt.style.use(PlotStyle.style)
+
+        self.fig, self.ax = plt.subplots(figsize=(5,3.5))
+        self.ax.axis('off')
+
         self.nconn = nconn
         self.pts = {}
         for i in range(nconn):
@@ -47,10 +57,10 @@ class Graph:
 
 
     def draw_point(self, pt, x):
-        style = GraphInfo.points[x] if x in GraphInfo.points else GraphInfo.points['default']
+        style = PlotStyle.points[x] if x in PlotStyle.points else PlotStyle.points['default']
 
         self.ax.scatter(*pt, **style)
-        self.ax.text(*pt, f'  {x}')
+        self.ax.text(*pt, f'  ${x}$')
 
 
     def __call__(self, title=''):
@@ -58,7 +68,7 @@ class Graph:
         self.fig.tight_layout()
 
     def line(self, x, y, s):
-        ls = GraphInfo.linestyles[s] if s in GraphInfo.linestyles else GraphInfo.linestyles['default']
+        ls = PlotStyle.linestyles[s] if s in PlotStyle.linestyles else PlotStyle.linestyles['default']
         patch = FancyArrowPatch(
             x, y,
             connectionstyle=f"arc3,rad={0.3}",
@@ -69,7 +79,7 @@ class Graph:
 
     def tadpole(self, x, s):
         x1, x2 = x
-        patch = Circle((x1+0.3, x2), radius=0.3, fill=False, color='k')
+        patch = Circle((x1+0.3, x2), radius=0.3, fill=False)
         self.ax.add_patch(patch)
 
     def draw_connected_diagram(self, propagators):
@@ -87,7 +97,7 @@ class Graph:
 
         for p in propagators:
             x, y = p.fx['pos'], p.fy['pos']
-            s = 'default' 
+            s = 'default'
             if x==y:
                 self.tadpole(pts[x], s)
             else:

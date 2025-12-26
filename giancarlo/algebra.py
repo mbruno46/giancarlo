@@ -1,7 +1,8 @@
 from copy import deepcopy
 import math
+# from fractions import Fraction
 
-from .utils import default, log
+from .utils import *
 from .wick import *
 from .draw import *
 
@@ -33,20 +34,34 @@ class Base:
     def tolist(self, ctype):
         return self.factors if isinstance(self, ctype) else [self] 
 
-    def mul_no_distribute(self, other):
-        return Product(self.tolist(Product) + other.tolist(Product))
+    # def mul_no_distribute(self, other):
+        # return Product(self.tolist(Product) + other.tolist(Product))
         
     def __mul__(self, other):
         if isinstance(other, Sum):
             return Sum([self * f for f in other.factors])
         return self @ other
 
+    # def __rmul__(self, other):
+    #     return Product([other] + [self])
+
     def __matmul__(self, other):
         return Product(self.tolist(Product) + other.tolist(Product))
     
     def __add__(self, other):
         return Sum(self.tolist(Sum) + other.tolist(Sum))
-        
+    
+    def __sub__(self, other):
+        return self + CNumber(-1) * other #.tolist(Sum)
+    
+    def __pow__(self, n):
+        out = self
+        for _ in range(1,n):
+            out *= self
+        return out
+    
+    ####
+
     def __repr__(self):
         return self.__str__()
 
@@ -65,27 +80,19 @@ class Base:
 
 class Product(Base):
     def __init__(self, factors = []):
-        self.factors = []
+        # flattens products of products
+        _factors = []
         for f in factors:
             if isinstance(f, Product):
-                self.factors.extend(f.factors)
+                _factors.extend(f.factors)
             else:
-                self.factors.append(f)
+                _factors.append(f)
 
-    @property
-    def size(self):
-        return len(self.factors)
-    
-    def __str__(self):
-        if default.latex:
-            return r"\,".join(map(str, self.factors))
-        return " * ".join(map(str, self.factors))
-    
-    def simplify(self, split=False):
+        # cnumber first, symbols second
         cs = []
         ss = []
         rs = []
-        for f in self.factors:
+        for f in _factors:
             if isinstance(f, CNumber):
                 cs.append(f)
             elif isinstance(f, Symbol):
@@ -93,22 +100,48 @@ class Product(Base):
             else:
                 rs.append(f)
         
-        prefactor = CNumber.reduce(cs) * Symbol.reduce(ss)
-        other = Product(rs)
+        # automatic reductions of products
+        self.cnum = CNumber.reduce(cs)
+        if self.cnum and self.cnum[0].numerator == 0:
+            self.symb = []
+            self.data = []
+        else:
+            self.symb = Symbol.reduce(ss)
+            self.data = rs
 
-        if split:
-            return prefactor, other
-        return prefactor * other
+    @property
+    def factors(self):
+        return self.cnum + self.symb + self.data
+
+    @property
+    def prefactor(self):
+        return Product(self.cnum + self.symb)
+    
+    @property
+    def size(self):
+        return len(self.factors)
+    
+    def __str__(self, latex=default.latex):
+        if latex:
+            return r"\,".join(map(str, self.factors))
+        return " * ".join(map(str, self.factors))
+    
+    # def __eq__(self, other):
+        # return isinstance(other, Product) and self.factors == other.factors
+    
+    # def simplify(self, split=False):
+    #     prefactor = 
+    #     if split:
+    #         return prefactor, other
+    #     return prefactor * other
     
     def wick(self, trace_indices = [], **kwargs):
-        prefactor, fields = self.simplify(split=True)
-
         terms = []
-        for c in wick_fields_fast(fields):
+        for c in wick_fields_fast(self.data):
             if 'wick' in default.debug:
                 log.debug(f' wick : {c}')
             tr = build_trace(Product(c()), Trace, trace_indices)
-            terms.append(prefactor * Product(tr))
+            terms.append(self.prefactor * Product(tr))
         
         return Sum(terms)
     
@@ -124,22 +157,36 @@ class Product(Base):
                 _no_traces.append(f)
         # keep only propagators
         _props = [p for p in _no_traces if p['pos']!=(None,None)]
-        print('quaa ', _props)
         connected = build_trace(Product(_props), Trace, indices=['pos'])
 
-        g = Graph(len(connected))
+        g = Diagram(len(connected))
         for conn in connected:
             g.draw_connected_diagram(conn.factors)
         g(self._repr_latex_())
 
+
 class Sum(Base):
     def __init__(self, factors = []):
-        self.factors = []
+        _factors = []
         for f in factors:
             if isinstance(f, Sum):
-                self.factors.extend(f.factors)
+                _factors.extend(f.factors)
             else:
-                self.factors.append(f)
+                _factors.append(f)
+        
+        count = Counter()
+        for f in _factors:
+            count(f)
+
+        self.factors = []
+        for f in count.unique():
+            if count[f]==0.0:
+                continue
+            elif count[f]==1.0:
+                self.factors.append(f if isinstance(f, Product) else Product([f]))
+            else:
+                self.factors.append(count[f] * f)
+
 
     def __str__(self):
         return f"( {' + '.join(map(str, self.factors))} )"
@@ -149,26 +196,23 @@ class Sum(Base):
             return Sum([f1 * f2 for f1 in self.factors for f2 in other.factors])
         return Sum([f * other for f in self.factors])
 
+
     def simplify(self):
-        keys = []
-        pref = []
-        rest = []
+        data = {}
 
         for f in self.factors:
-            p, r = f.simplify(split = True)
-            k = str(r)
-            if k in keys:
-                pref[keys.index(k)] += p
+            p, d = f.prefactor, Product(f.data)
+            k = str(d)
+            if k in data:
+                data[k][0] += p
             else:
-                keys += [k]
-                pref += [p]
-                rest += [r]
+                data[k] = [p, d]
 
         if 'simplify' in default.debug:
-            for p, r in zip(pref, rest):
-                log.debug(f'( {p} ) * ( {r} )')
-        
-        return Sum([p @ r for p, r in zip(pref, rest)])
+            for key in data:
+                log.debug(f'( {data[key][0]} ) * ( {data[key][1]} )')
+
+        return Sum([data[key][0] @ data[key][1] for key in data])
     
     def wick(self, *args, **kwargs):
         return Sum([f.wick(*args, **kwargs) for f in self.factors])
@@ -225,17 +269,45 @@ class Trace(Base):
     #     return
 
 class CNumber(Base):
-    def __init__(self, value):
-        self.value = value
-
+    def __init__(self, numerator, denominator=1):
+        if not isinstance(numerator, int):
+            assert denominator==1
+            self.numerator = numerator
+            self.denominator = 1
+        else:
+            assert isinstance(denominator, int)
+            gcd = math.gcd(numerator, denominator)
+            self.numerator = numerator // gcd
+            self.denominator = denominator // gcd
+        
+    def __add__(self, other):
+        if isinstance(other, CNumber):
+            return CNumber(self.numerator*other.denominator + self.denominator*other.numerator, self.denominator*other.denominator)
+        return super().__add__(other)
+    
+    def __mul__(self, other):
+        if isinstance(other, CNumber):
+            return CNumber(self.numerator*other.numerator, self.denominator*other.denominator)
+        return super().__mul__(other)
+    
+    def __eq__(self, value):
+        _value = self.numerator/self.denominator
+        return _value == value
+    
     def __str__(self):
-        return f'{self.value}'
+        if self.denominator==1.0:
+            if self.numerator==1.0:
+                return ''
+            return f'{self.numerator}'
+        return rf'\frac{{{self.numerator}}}{{{self.denominator}}}'
 
-    def reduce(cnumbers: list) -> Product:
+    def reduce(cnumbers: list) -> list:
         if not cnumbers:
-            return Product()
-        return Product([CNumber(math.prod([c.value for c in cnumbers]))])
-
+            return []
+        p = cnumbers[0]
+        for c in cnumbers[1:]:
+            p *= c
+        return [p]
 
 class Symbol(Base):
     def __init__(self, value: str, pow: int = 1):
@@ -245,9 +317,9 @@ class Symbol(Base):
     def __str__(self):
         return self.value + (f'^{self.pow}' if self.pow>1 else '')
 
-    def reduce(symbols: list) -> Product:
+    def reduce(symbols: list) -> list:
         if not symbols:
-            return Product()
+            return []
         
         vals = [s.value for s in symbols]
         pows = [s.pow for s in symbols]
@@ -262,4 +334,31 @@ class Symbol(Base):
                 i = _vals.index(v)
                 _pows[i] += p
 
-        return Product([Symbol(_v,_p) for _v, _p in zip(_vals, _pows)])
+        return sorted([Symbol(_v,_p) for _v, _p in zip(_vals, _pows)], key=str)
+
+
+class Counter:
+    def __init__(self):
+        self.data = {}
+        self.count = {}
+
+    def __call__(self, item):
+        f = CNumber(1)
+        if isinstance(item, Product):
+            cn, item = item.cnum, Product(item.symb + item.data)
+            if cn:
+                f = cn[0]
+                
+        key = str(item)
+        if key in self.count:
+            self.count[key] += f
+        else:
+            self.count[key] = f
+            self.data[key] = item
+
+    def __getitem__(self, item):
+        key = str(item)
+        return self.count[key]
+    
+    def unique(self):
+        return [self.data[key] for key in self.count] 

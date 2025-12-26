@@ -70,13 +70,13 @@ def wick_fields(expr):
     return contractions
 
 
-def wick_fields_fast(expr):
+def wick_fields_fast(factors):
     contractions = []
     stack = []
 
     def backtrack(remaining, paired):
         if not remaining:
-            _c = Contraction(expr.factors, list(paired))
+            _c = Contraction(factors, list(paired))
             if _c.fully_contracted:
                 if _c.tag not in stack:
                     stack.append(_c.tag)
@@ -92,14 +92,14 @@ def wick_fields_fast(expr):
                 f1 = remaining[i]
 
                 if f0.can_be_contracted(f1):
-                    i0 = expr.factors.index(f0)
-                    i1 = expr.factors.index(f1)
+                    i0 = factors.index(f0)
+                    i1 = factors.index(f1)
                     paired.append((i0,i1))
 
                     backtrack([f for f in remaining if f not in (f0, f1)], paired)
                     paired.pop()
 
-    backtrack(expr.factors, [])
+    backtrack(factors, [])
     return contractions
 
 def build_trace(expr, Trace_class, indices):
