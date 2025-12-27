@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "giancarlo"
+version = "0.1.0"
+description = "A Python library to perform Wick contractions in quantum field theories"
+readme = "README.md"
+license = { text = "GPL-3.0" }
+authors = [
+    { name = "Mattia Bruno", email = "" }
+]
+keywords = [
+    "quantum-field-theory",
+    "wick-theorem",
+    "symbolic",
+    "physics"
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Topic :: Scientific/Engineering :: Physics",
+    "Topic :: Scientific/Engineering :: Mathematics"
+]
+requires-python = ">=3.7"
+
+dependencies = [
+    "matplotlib"
+]
+
+[project.urls]
+Homepage = "https://github.com/mbruno46/giancarlo"
+Repository = "https://github.com/mbruno46/giancarlo"
+
+[tool.setuptools.packages.find]
+where = ["."]
+exclude = ["tests*", "tutorials*"]

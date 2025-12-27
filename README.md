@@ -18,6 +18,12 @@ It provides tools to represent and manipulate creation and annihilation operator
 ## Installation
 
 ```bash
+pip install git+https://github.com/mbruno46/giancarlo.git
+```
+
+If you want to hack the library locally
+
+```bash
 git clone https://github.com/mbruno46/giancarlo.git
 cd giancarlo
 pip install -e .
