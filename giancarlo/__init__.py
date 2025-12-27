@@ -32,6 +32,16 @@ def ScalarField(flavor):
         return Field(id, rf'{{{flavor}}}^\dagger', True, {'pos': pos})
     return phi, phidag
 
+def PhotonField():
+    id = default.new()
+    def a(pos, mu):
+        return Field(id, 'A', False, {'pos': pos, 'lorentz': mu}, linestyle='squiggle')
+    def adag(pos, mu):
+        return Field(id, 'Adag', True, {'pos': pos, 'lorentz': mu})
+    def A(pos, mu):
+        return a(pos, mu) + adag(pos,mu)
+    return A
+
 def SpinorField(flavor):
     id = default.new()
     def psi(pos, spin):

@@ -23,11 +23,12 @@ __all__ = [
 ]
 
 class Field(Base):
-    def __init__(self, id: int, tag: str, anti: bool, index: dict = {}):
+    def __init__(self, id: int, tag: str, anti: bool, index: dict = {}, linestyle = 'default'):
         self.id = id
         self.tag = tag
         self.anti = anti
         self.index = index
+        self.linestyle = linestyle
 
     def __str__(self):
         tags = ''.join(f'{self.index[key]}, ' for key in self.index if default.verbose[key])
@@ -44,7 +45,9 @@ class Field(Base):
         return False
 
     def contract(self, other: Field):
-        return Propagator(self, other)
+        p = Propagator(self, other)
+        p.linestyle = self.linestyle
+        return p
     
 class Propagator(Base):
     def __init__(self, fx, fy):
@@ -60,6 +63,8 @@ class Propagator(Base):
         for key in fx.index:
             self.index[key] = (fx[key], fy[key])
         
+        self.linestyle = 'default'
+
     def __str__(self):
         if self.fx.tag == 'G':
             for key in self.index:
@@ -80,4 +85,7 @@ class Propagator(Base):
     def _replace(self, rdict):
         if self.tag in rdict:
             self.tag = rdict[self.tag]
+        for idx in self.index:
+            if (idx in rdict) and (rdict[idx][0] == self.index[idx]):
+                self.index[idx] = rdict[idx][1]
 

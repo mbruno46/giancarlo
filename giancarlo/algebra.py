@@ -22,7 +22,8 @@ from .draw import *
 __all__ = [
     "Base",
     "CNumber",
-    "Symbol"
+    "Symbol",
+    "Topologies"
 ]
 
 class Base:        
@@ -47,16 +48,10 @@ class Base:
     def tolist(self, ctype):
         return self.factors if isinstance(self, ctype) else [self] 
 
-    # def mul_no_distribute(self, other):
-        # return Product(self.tolist(Product) + other.tolist(Product))
-        
     def __mul__(self, other):
         if isinstance(other, Sum):
             return Sum([self * f for f in other.factors])
         return self @ other
-
-    # def __rmul__(self, other):
-    #     return Product([other] + [self])
 
     def __matmul__(self, other):
         return Product(self.tolist(Product) + other.tolist(Product))
@@ -139,15 +134,6 @@ class Product(Base):
             return r"\,".join(map(str, self.factors))
         return " * ".join(map(str, self.factors))
     
-    # def __eq__(self, other):
-        # return isinstance(other, Product) and self.factors == other.factors
-    
-    # def simplify(self, split=False):
-    #     prefactor = 
-    #     if split:
-    #         return prefactor, other
-    #     return prefactor * other
-    
     def wick(self, trace_indices = [], **kwargs):
         terms = []
         for c in wick_fields_fast(self.data):
@@ -158,7 +144,7 @@ class Product(Base):
         
         return Sum(terms)
     
-    def draw(self):
+    def draw(self, title=''):
         # remove prefactors
         _data = [f for f in self.factors if not isinstance(f, (Sum, CNumber, Symbol))]
         # remove traces
@@ -171,11 +157,11 @@ class Product(Base):
         # keep only propagators
         _props = [p for p in _no_traces if p['pos']!=(None,None)]
         connected = build_trace(Product(_props), Trace, indices=['pos'])
-
+        
         g = Diagram(len(connected))
         for conn in connected:
             g.draw_connected_diagram(conn.factors)
-        g(self._repr_latex_())
+        g(self._repr_latex_() if title=='' else title)
 
 
 class Sum(Base):
@@ -210,10 +196,14 @@ class Sum(Base):
         return Sum([f * other for f in self.factors])
 
 
-    def simplify(self):
+    def simplify(self, *args):
         data = {}
 
-        for f in self.factors:
+        expr = self
+        for a in args:
+            expr = a(expr)
+
+        for f in expr.factors:
             p, d = f.prefactor, Product(f.data)
             k = str(d)
             if k in data:
@@ -259,27 +249,6 @@ class Trace(Base):
             return self
         return Product(self.factors)
     
-    # def cyclic(self):
-    #     def scroll(lst, n):
-    #         n = n % len(lst)
-    #         return lst[-n:] + lst[:-n]
-
-    #     for i in range(len(self.factors)):
-    #         t = Trace(self.index)
-    #         t.factors = scroll(self.factors, i)
-    #         yield t
-
-    # def draw(self, g):
-    #     lines = [f for f in self.factors if f.tag[0] == 'S']
-    #     if len(lines)==1:
-    #         g.draw_tadpole(lines[0].fx['pos'])
-    #     else:
-    #         loop = g.new_loop()
-    #         for f in self.factors:
-    #             if f.tag[0] == 'S': # it's a propagator
-    #                 loop.add_line(f.fx['pos'], f.fy['pos'])
-    #         loop()
-    #     return
 
 class CNumber(Base):
     def __init__(self, numerator, denominator=1):
@@ -374,4 +343,27 @@ class Counter:
         return self.count[key]
     
     def unique(self):
-        return [self.data[key] for key in self.count] 
+        return [self.data[key] for key in self.count]
+    
+
+class Topologies:
+    def __init__(self, expr, *indices):
+        self.coeff = []
+        self.topo = []
+
+        for i in indices:
+            coeff, topo = None, None
+            for j in i:
+                if coeff is None:
+                    coeff, topo = expr[j][0], Product(expr[j][1:])
+                else:
+                    coeff += expr[j][0]
+            self.coeff.append(coeff)
+            self.topo.append(topo)
+
+    def draw(self, i=None):
+        if i is None:
+            for i in range(len(self.coeff)):
+                self.draw(i)
+        else:
+            self.topo[i].draw(self.coeff[i]._repr_latex_())

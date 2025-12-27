@@ -13,7 +13,11 @@
 #
 
 import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 from matplotlib.patches import FancyArrowPatch, Circle
+from matplotlib.path import Path
+import math
+
 plt.rcParams.update({
     'font.size': 14
 })
@@ -38,10 +42,42 @@ def fill_points_circle(d: dict, radius=1.0, center=(0.0, 0.0)):
     return
 
 
+def squiggle_patch(p0, p1, n_periods=5, amp=0.05, n_points=300, **patch_kwargs):
+    x0, y0 = p0
+    x1, y1 = p1
+
+    dx, dy = x1 - x0, y1 - y0
+    length = math.hypot(dx, dy)
+
+    nx, ny = -dy / length, dx / length
+
+    verts = []
+    codes = []
+    for i in range(n_points):
+        t = i / (n_points-1)
+        x = x0 + dx * t
+        y = y0 + dy * t
+
+        # Sinusoidal offset
+        phase = 2 * math.pi * n_periods * t
+        offset = amp * math.sin(phase)
+
+        x += nx * offset
+        y += ny * offset
+
+        verts.append((x,y))
+        codes.append(Path.MOVETO if i==0 else Path.LINETO)
+
+    path = Path(verts, codes)
+    return patches.PathPatch(path, fill=False, **patch_kwargs)
+
+
+
 class PlotStyle:
     points = {}
     linestyles = {
         'default': '-',
+        'squiggle': '',
     }
     style = 'default'
 
@@ -78,17 +114,24 @@ class Diagram:
 
 
     def __call__(self, title=''):
+        for x in self.pts:
+            if type(x) is str:
+                self.draw_point(self.pts[x], x)
+        
         self.ax.set_title(title)
         self.fig.tight_layout()
 
     def line(self, x, y, s):
         ls = PlotStyle.linestyles[s] if s in PlotStyle.linestyles else PlotStyle.linestyles['default']
-        patch = FancyArrowPatch(
-            x, y,
-            connectionstyle=f"arc3,rad={0.3}",
-            arrowstyle='-',
-            ls=ls
-        )
+        if s=='squiggle':
+            patch = squiggle_patch(x, y)
+        elif s=='default':
+            patch = FancyArrowPatch(
+                x, y,
+                connectionstyle=f"arc3,rad={0.3}",
+                arrowstyle='-',
+                ls=ls
+            )
         self.ax.add_patch(patch)
 
     def tadpole(self, x, s):
@@ -109,13 +152,14 @@ class Diagram:
 
         fill_points_circle(pts, radius=0.5, center=self.pts[self.idx])
 
+        for pt in pts:
+            self.pts[pt] = pts[pt]
+        del pts
+
         for p in propagators:
             x, y = p.fx['pos'], p.fy['pos']
-            s = 'default'
+            s = p.linestyle
             if x==y:
-                self.tadpole(pts[x], s)
+                self.tadpole(self.pts[x], s)
             else:
-                self.line(pts[x], pts[y], s)
-            
-        for x in pts:
-            self.draw_point(pts[x], x)
+                self.line(self.pts[x], self.pts[y], s)

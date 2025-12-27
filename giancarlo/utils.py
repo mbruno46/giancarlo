@@ -14,7 +14,8 @@
 
 __all__ = [
     "default",
-    "log"
+    "log",
+    "symmetry"
 ]
 
 def inside_ipython():
