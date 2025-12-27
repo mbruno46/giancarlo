@@ -309,6 +309,9 @@ class Symbol(Base):
     def __str__(self):
         return self.value + (f'^{self.pow}' if self.pow>1 else '')
 
+    def __eq__(self, other):
+        return isinstance(other, Symbol) and [self.value, self.pow] == [other.value, other.pow]
+    
     def reduce(symbols: list) -> list:
         if not symbols:
             return []
