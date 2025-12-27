@@ -125,6 +125,12 @@ class Product(Base):
     def prefactor(self):
         return Product(self.cnum + self.symb)
     
+    def safe_split(self):
+        if not self.cnum and not self.symb:
+            if isinstance(self.data[0], Sum):
+                return self.data[0], Product(self.data[1:])
+        return self.prefactor, Product(self.data)
+    
     @property
     def size(self):
         return len(self.factors)
@@ -254,8 +260,11 @@ class CNumber(Base):
     def __init__(self, numerator, denominator=1):
         if not isinstance(numerator, int):
             assert denominator==1
-            self.numerator = numerator
             self.denominator = 1
+            if isinstance(numerator, complex) and numerator.imag==0.0:
+                self.numerator = numerator.real
+            else:
+                self.numerator = numerator
         else:
             assert isinstance(denominator, int)
             gcd = math.gcd(numerator, denominator)
@@ -290,6 +299,7 @@ class CNumber(Base):
         for c in cnumbers[1:]:
             p *= c
         return [p]
+
 
 class Symbol(Base):
     def __init__(self, value: str, pow: int = 1):
@@ -355,9 +365,9 @@ class Topologies:
             coeff, topo = None, None
             for j in i:
                 if coeff is None:
-                    coeff, topo = expr[j][0], Product(expr[j][1:])
+                    coeff, topo = expr[j].safe_split()
                 else:
-                    coeff += expr[j][0]
+                    coeff += expr[j].safe_split()[0]
             self.coeff.append(coeff)
             self.topo.append(topo)
 
