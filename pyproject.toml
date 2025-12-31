@@ -9,7 +9,7 @@ description = "A Python library to perform Wick contractions in quantum field th
 readme = "README.md"
 license = { text = "GPL-3.0" }
 authors = [
-    { name = "Mattia Bruno", email = "" }
+    { name = "Mattia Bruno", email = "mattia.bruno@unimib.it" }
 ]
 keywords = [
     "quantum-field-theory",
@@ -27,7 +27,6 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Mathematics"
 ]
 requires-python = ">=3.7"
-
 dependencies = [
     "matplotlib"
 ]
