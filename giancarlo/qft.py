@@ -23,10 +23,11 @@ __all__ = [
 ]
 
 class Field(Base):
-    def __init__(self, id: int, tag: str, anti: bool, index: dict = {}, linestyle = 'default'):
+    def __init__(self, id: int, tag: str, anti: bool, boson: bool, index: dict = {}, linestyle = 'default'):
         self.id = id
         self.tag = tag
         self.anti = anti
+        self.boson = boson
         self.index = index
         self.linestyle = linestyle
 

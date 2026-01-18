@@ -16,13 +16,14 @@ from itertools import permutations
 from .utils import default, log
 
 class Contraction:
-    def __init__(self, fields, pairs = []):
+    def __init__(self, fields, pairs = [], sign = 1):
         self.pairs = pairs
         self._tag = None
         self.fields = fields
-        
-    def append(self, i, j=None):
-        self.pairs.append((i,j))
+        self.sign = sign
+
+    # def append(self, i, j=None):
+    #     self.pairs.append((i,j))
 
     def __repr__(self):
         return str(self.__dict__)
@@ -88,9 +89,15 @@ def wick_fields_fast(factors):
     contractions = []
     stack = []
 
-    def backtrack(remaining, paired):
+    def get_sign(remaining):
+        s = 1
+        for f in remaining:
+            s *= f.sign
+        return s
+    
+    def backtrack(remaining, paired, sign = 1):
         if not remaining:
-            _c = Contraction(factors, list(paired))
+            _c = Contraction(factors, list(paired), sign)
             if _c.fully_contracted:
                 if _c.tag not in stack:
                     stack.append(_c.tag)
@@ -109,8 +116,9 @@ def wick_fields_fast(factors):
                     i0 = factors.index(f0)
                     i1 = factors.index(f1)
                     paired.append((i0,i1))
-
-                    backtrack([f for f in remaining if f not in (f0, f1)], paired)
+                    _sign = get_sign(remaining[j+1:i+1])
+                    
+                    backtrack([f for f in remaining if f not in (f0, f1)], paired, sign * _sign)
                     paired.pop()
 
     backtrack(factors, [])

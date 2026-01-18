@@ -13,6 +13,7 @@
 #
 
 from copy import deepcopy
+from itertools import permutations
 import math
 
 from .utils import *
@@ -26,7 +27,7 @@ __all__ = [
     "Topologies"
 ]
 
-class Base:        
+class Base:           
     def wick(self):
         return self
 
@@ -67,6 +68,12 @@ class Base:
         for _ in range(1,n):
             out *= self
         return out
+
+    def __len__(self):
+        if hasattr(self, "factors"):
+            return len(self.factors)
+        else:
+            return 1
     
     ####
 
@@ -85,6 +92,11 @@ class Base:
     def draw(self):
         pass
 
+    @property
+    def sign(self):
+        if hasattr(self, "boson"):
+            return 1 if self.boson else -1
+        return 1
 
 class Product(Base):
     def __init__(self, factors = []):
@@ -140,14 +152,12 @@ class Product(Base):
             return r"\,".join(map(str, self.factors))
         return " * ".join(map(str, self.factors))
     
-    def wick(self, trace_indices = [], **kwargs):
+    def wick(self):
         terms = []
         for c in wick_fields_fast(self.data):
             if 'wick' in default.debug:
                 log.debug(f' wick : {c}')
-            tr = build_trace(Product(c()), Trace, trace_indices)
-            terms.append(self.prefactor * Product(tr))
-        
+            terms.append(CNumber(c.sign) * self.prefactor * Product(c()))
         return Sum(terms)
     
     def draw(self, title=''):
@@ -169,7 +179,10 @@ class Product(Base):
             g.draw_connected_diagram(conn.factors)
         g(self._repr_latex_() if title=='' else title)
 
-
+    def trace(self, indices = []):
+        tr = build_trace(Product(self.data), Trace, indices)
+        return self.prefactor * Product(tr)
+    
 class Sum(Base):
     def __init__(self, factors = []):
         _factors = []
@@ -223,9 +236,12 @@ class Sum(Base):
 
         return Sum([data[key][0] @ data[key][1] for key in data])
     
-    def wick(self, *args, **kwargs):
-        return Sum([f.wick(*args, **kwargs) for f in self.factors])
+    def wick(self):
+        return Sum([f.wick() for f in self.factors])
 
+    def trace(self, indices = []):
+        return Sum([f.trace(indices) for f in self.factors])
+    
     def elements(self):
         for f in self.factors:
             yield f
@@ -238,7 +254,8 @@ class Trace(Base):
     def __init__(self, indices: list):
         self.factors = []
         self.indices = indices
-
+        # self.sign = CNumber(-1) if 'spin' in indices else None
+        
     def __imul__(self, other):
         self.factors.append(other)
         return self
@@ -252,6 +269,9 @@ class Trace(Base):
         indices0 = [self.factors[0].fx[idx] for idx in self.indices]
         indices1 = [self.factors[-1].fy[idx] for idx in self.indices]
         if indices0 == indices1:
+            # if self.sign:
+            #     return self.sign * self
+            # else:
             return self
         return Product(self.factors)
     
