@@ -32,7 +32,8 @@ class Field(Base):
         self.linestyle = linestyle
 
     def __str__(self):
-        tags = ''.join(f'{self.index[key]}, ' for key in self.index if default.verbose[key])
+        # tags = ''.join(f'{self.index[key]}, ' for key in self.index if default.verbose[key])
+        tags = ''.join(f'{self.index[key]}, ' for key in self.index)
         return f'{self.tag}({tags[:-2]})'
 
     def __getitem__(self, idx):
@@ -62,7 +63,7 @@ class Propagator(Base):
         
         self.index = {}
         for key in fx.index:
-            self.index[key] = (fx[key], fy[key])
+            self.index[key] = [fx[key], fy[key]]
         
         self.linestyle = 'default'
 
@@ -87,6 +88,9 @@ class Propagator(Base):
         if self.tag in rdict:
             self.tag = rdict[self.tag]
         for idx in self.index:
-            if (idx in rdict) and (rdict[idx][0] == self.index[idx]):
-                self.index[idx] = rdict[idx][1]
+            if (idx in rdict):
+                if rdict[idx][0] == self.index[idx][0]:
+                    self.index[idx][0] = rdict[idx][1]
+                if rdict[idx][0] == self.index[idx][1]:
+                    self.index[idx][1] = rdict[idx][1]
 

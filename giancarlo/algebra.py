@@ -13,18 +13,19 @@
 #
 
 from copy import deepcopy
-from itertools import permutations
+from itertools import permutations, combinations
 import math
 
 from .utils import *
 from .wick import *
 from .draw import *
+from .utils import default
 
 __all__ = [
     "Base",
     "CNumber",
     "Symbol",
-    "Topologies"
+    "ExchangeSymmetry"
 ]
 
 class Base:           
@@ -111,12 +112,15 @@ class Product(Base):
         # cnumber first, symbols second
         cs = []
         ss = []
+        ps = Sum()
         rs = []
         for f in _factors:
             if isinstance(f, CNumber):
                 cs.append(f)
             elif isinstance(f, Symbol):
                 ss.append(f)
+            elif isinstance(f, Sum):
+                ps += f
             else:
                 rs.append(f)
         
@@ -124,24 +128,26 @@ class Product(Base):
         self.cnum = CNumber.reduce(cs)
         if self.cnum and self.cnum[0].numerator == 0:
             self.symb = []
+            self.sum = []
             self.data = []
         else:
             self.symb = Symbol.reduce(ss)
+            self.sum = [ps] if len(ps)>0 else []
             self.data = rs
 
     @property
     def factors(self):
-        return self.cnum + self.symb + self.data
+        return self.cnum + self.symb + self.sum + self.data
 
     @property
     def prefactor(self):
-        return Product(self.cnum + self.symb)
+        return Product(self.cnum + self.symb + self.sum)
     
-    def safe_split(self):
-        if not self.cnum and not self.symb:
-            if isinstance(self.data[0], Sum):
-                return self.data[0], Product(self.data[1:])
-        return self.prefactor, Product(self.data)
+    # def safe_split(self):
+    #     if not self.cnum and not self.symb:
+    #         if isinstance(self.data[0], Sum):
+    #             return self.data[0], Product(self.data[1:])
+    #     return self.prefactor, Product(self.data)
     
     @property
     def size(self):
@@ -152,6 +158,11 @@ class Product(Base):
             return r"\,".join(map(str, self.factors))
         return " * ".join(map(str, self.factors))
     
+    def is_negative(self):
+        if self.cnum:
+            return self.cnum[0].negative
+        return False
+
     def wick(self):
         terms = []
         for c in wick_fields_fast(self.data):
@@ -183,6 +194,16 @@ class Product(Base):
         tr = build_trace(Product(self.data), Trace, indices)
         return self.prefactor * Product(tr)
     
+    def permutations(self):
+        assert sum([f.sign for f in self.factors]) == len(self.factors)
+        for p in permutations(self.factors):
+            yield Product(list(p))
+
+    def __contains__(self, other):
+        A = other.cyclic_permutations() if isinstance(other, Trace) else [str(other)]
+        B = [str(f) for f in self.factors]
+        return bool(set(A) & set(B))
+
 class Sum(Base):
     def __init__(self, factors = []):
         _factors = []
@@ -191,7 +212,7 @@ class Sum(Base):
                 _factors.extend(f.factors)
             else:
                 _factors.append(f)
-        
+
         count = Counter()
         for f in _factors:
             count(f)
@@ -207,34 +228,58 @@ class Sum(Base):
 
 
     def __str__(self):
-        return f"( {' + '.join(map(str, self.factors))} )"
+        if not self.factors:
+            return "0"
+        func = lambda f: str(f) if f.is_negative() else '+'+str(f)
+        return f"( {''.join(map(func, self.factors))} )"
 
     def __mul__(self, other):
         if isinstance(other, Sum):
             return Sum([f1 * f2 for f1 in self.factors for f2 in other.factors])
         return Sum([f * other for f in self.factors])
 
-
     def simplify(self, *args):
         data = {}
+        
+        symmetries = [IdentitySymmetry()] if not any(isinstance(x, IdentitySymmetry) for x in args) else []
+        symmetries.extend(list(args))
 
-        expr = self
-        for a in args:
-            expr = a(expr)
+        symmetries_combined = [
+            GenericSymmetry(combo)
+            for r in range(1, len(symmetries) + 1)
+            for combo in combinations(symmetries, r)
+        ]
 
-        for f in expr.factors:
-            p, d = f.prefactor, Product(f.data)
-            k = str(d)
-            if k in data:
-                data[k][0] += p
-            else:
-                data[k] = [p, d]
+        def add_to_data(p, expr: Product):
+            for k, (_, d) in data.items():
+                for s in symmetries_combined:
+                    count = 0
+                    for element in s(d).factors:
+                        if element in expr:
+                            count += 1
+                    if count == len(d):
+                        data[k][0] += p
+                        return
+            # for perm_d in expr.permutations():
+            #     for s in symmetries:
+            #         k = str(s(perm_d))
+            #         if k in data:
+            #             data[k][0] += p
+            #             return
+
+            k = str(expr)
+            data[k] = [p, expr]
+            return
+        
+        for f in self.factors:
+            p, d = f.prefactor, Product(f.data)                
+            add_to_data(p, d)
 
         if 'simplify' in default.debug:
             for key in data:
                 log.debug(f'( {data[key][0]} ) * ( {data[key][1]} )')
 
-        return Sum([data[key][0] @ data[key][1] for key in data])
+        return Sum([data[key][0] @ data[key][1] for key in data if data[key][0].factors])
     
     def wick(self):
         return Sum([f.wick() for f in self.factors])
@@ -262,7 +307,12 @@ class Trace(Base):
     
     def __str__(self):
         tag = ' '.join(rf'\mathrm{{Tr}}_\mathrm{{{idx}}}' for idx in self.indices if idx!='pos')
-        return f'{tag} [ {Product(self.factors)} ]'
+        for idx in self.indices:
+            default.verbose[idx] = False
+        s = f'{tag} [ {Product(self.factors)} ]'
+        for idx in self.indices:
+            default.verbose[idx] = True
+        return s
 
     # checks that trace effectively is closed, otherwise returns product
     def __call__(self):
@@ -275,22 +325,69 @@ class Trace(Base):
             return self
         return Product(self.factors)
     
-
+    def cyclic_permutations(self):
+        out = []
+        for i in range(len(self.factors)):
+            t = Trace(self.indices)
+            t.factors = self.factors[i:] + self.factors[:i]
+            out.append(str(t))
+            del t
+        return out
+    
 class CNumber(Base):
     def __init__(self, numerator, denominator=1):
-        if not isinstance(numerator, int):
-            assert denominator==1
-            self.denominator = 1
-            if isinstance(numerator, complex) and numerator.imag==0.0:
-                self.numerator = numerator.real
-            else:
-                self.numerator = numerator
-        else:
-            assert isinstance(denominator, int)
+        def snap_int(x, tol=1e-12):
+            if math.isclose(x, round(x), abs_tol=tol):
+                return int(round(x))
+            return x
+        
+        if isinstance(numerator,int) and isinstance(denominator, int):
             gcd = math.gcd(numerator, denominator)
             self.numerator = numerator // gcd
             self.denominator = denominator // gcd
-        
+        else:
+            for key in ['numerator', 'denominator']:
+                number = snap_int(locals()[key])
+                if isinstance(number, complex):
+                    setattr(self, key, number.real if number.imag==0.0 else number)
+                else:
+                    setattr(self, key, number)
+
+        if isinstance(self.numerator, complex):
+            self.negative = False
+        else:
+            self.negative = self.numerator * self.denominator < 0
+
+        # if denominator == 1.0:
+        #     self.denominator = 1.0
+        #     if isinstance(self.numerator, complex):
+        #         if (numerator.imag!=0.0):
+        #             self.numerator = numerator
+        #             self.negative = False
+        #             self.repr = f'{self.numerator}'
+        #         else:
+        #             self.numerator = numerator.real
+        #             self.negative = self.numerator * self.denominator < 0
+        #             sign = '-' if self.negative else ''
+        #             self.repr = f'{sign}{abs(self.numerator)}'
+        #     else:
+        #         self.numerator = numerator
+        #         self.negative = self.numerator * self.denominator < 0
+        #         sign = '-' if self.negative else ''
+        #         self.repr = f'{sign}{abs(self.numerator) if not self.numerator in (1.0, -1.0) else ""}'
+        # else:
+        #     if isinstance(denominator, int) and isinstance(numerator, int):
+        #         gcd = math.gcd(numerator, denominator)
+        #         self.numerator = numerator // gcd
+        #         self.denominator = denominator // gcd
+        #     else:
+        #         self.numerator = numerator
+        #         self.denominator = denominator
+
+        #     self.negative = self.numerator * self.denominator < 0
+        #     sign = '-' if self.negative else ''
+        #     self.repr = rf'{sign}\frac{{{abs(self.numerator)}}}{{{self.denominator}}}'
+
     def __add__(self, other):
         if isinstance(other, CNumber):
             return CNumber(self.numerator*other.denominator + self.denominator*other.numerator, self.denominator*other.denominator)
@@ -306,10 +403,11 @@ class CNumber(Base):
         return _value == value
     
     def __str__(self):
+        sign = '-' if self.negative else ''
         if self.denominator==1.0:
-            if self.numerator==1.0:
-                return ''
-            return f'{self.numerator}'
+            if self.numerator in (1.0, -1.0):
+                return f'{sign}'
+            return f'{sign}{abs(self.numerator)}'
         return rf'\frac{{{self.numerator}}}{{{self.denominator}}}'
 
     def reduce(cnumbers: list) -> list:
@@ -360,7 +458,7 @@ class Counter:
     def __call__(self, item):
         f = CNumber(1)
         if isinstance(item, Product):
-            cn, item = item.cnum, Product(item.symb + item.data)
+            cn, item = item.cnum, Product(item.symb + item.sum + item.data)
             if cn:
                 f = cn[0]
                 
@@ -379,24 +477,53 @@ class Counter:
         return [self.data[key] for key in self.count]
     
 
-class Topologies:
-    def __init__(self, expr, *indices):
-        self.coeff = []
-        self.topo = []
+# class Topologies:
+#     def __init__(self, expr, *indices):
+#         self.coeff = []
+#         self.topo = []
 
-        for i in indices:
-            coeff, topo = None, None
-            for j in i:
-                if coeff is None:
-                    coeff, topo = expr[j].safe_split()
-                else:
-                    coeff += expr[j].safe_split()[0]
-            self.coeff.append(coeff)
-            self.topo.append(topo)
+#         for i in indices:
+#             coeff, topo = None, None
+#             for j in i:
+#                 if coeff is None:
+#                     coeff, topo = expr[j].safe_split()
+#                 else:
+#                     coeff += expr[j].safe_split()[0]
+#             self.coeff.append(coeff)
+#             self.topo.append(topo)
 
-    def draw(self, i=None):
-        if i is None:
-            for i in range(len(self.coeff)):
-                self.draw(i)
-        else:
-            self.topo[i].draw(self.coeff[i]._repr_latex_())
+#     def draw(self, i=None):
+#         if i is None:
+#             for i in range(len(self.coeff)):
+#                 self.draw(i)
+#         else:
+#             self.topo[i].draw(self.coeff[i]._repr_latex_())
+
+class GenericSymmetry:
+    def __init__(self, symmetries):
+        self.symmetries = symmetries
+
+    def __call__(self, target: Product):
+        tmp = target
+        for s in self.symmetries:
+            tmp = s(tmp)
+        return tmp
+
+class IdentitySymmetry:
+    def __call__(self, target: Product):
+        return target
+    
+class ExchangeSymmetry:
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+
+    def __call__(self, target: Product):
+        r1 = {}
+        r2 = {}
+        r3 = {}
+        for k, v in self.kwargs.items():
+            tmp = f'aaaaa{k}'
+            r1[k] = [v[0], tmp]
+            r2[k] = [v[1], v[0]]
+            r3[k] = [tmp, v[1]]
+        return target.replace(r1).replace(r2).replace(r3)

@@ -116,7 +116,11 @@ def wick_fields_fast(factors):
                     i0 = factors.index(f0)
                     i1 = factors.index(f1)
                     paired.append((i0,i1))
-                    _sign = get_sign(remaining[j+1:i+1])
+                    if i>j:
+                        _sign = get_sign(remaining[j+1:i])
+                    else:
+                        _sign = get_sign(remaining[i+1:j+1])
+                    # print(i0, i1, remaining[min(j,i)+1:max(i,j)+1], _sign)
                     
                     backtrack([f for f in remaining if f not in (f0, f1)], paired, sign * _sign)
                     paired.pop()
