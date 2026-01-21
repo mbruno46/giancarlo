@@ -29,8 +29,9 @@ class default:
     var_id = 0
     verbose = {
         'pos': True,
-        'spin': False,
-        'lorentz': True
+        'spin': True,
+        'lorentz': True,
+        'color': True,
     }
     debug = [] #'wick', 'simplify']
     latex = inside_ipython()
@@ -43,7 +44,7 @@ class default:
     @classmethod
     def var(cls):
         cls.var_id += 1
-        return f'x{cls.var_id}'        
+        return f'x_{{{cls.var_id}}}'
 
 
 class Log:

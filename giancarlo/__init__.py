@@ -50,6 +50,14 @@ def SpinorField(flavor):
         return Field(id, rf'\bar{{{flavor}}}', True, False, {'pos': pos, 'spin': spin})
     return psi, psibar
 
+def QuarkField(flavor):
+    id = default.new()
+    def psi(pos, spin, color):
+        return Field(id, flavor, False, False, {'pos': pos, 'spin': spin, 'color': color})
+    def psibar(pos, spin, color):
+        return Field(id, rf'\bar{{{flavor}}}', True, False, {'pos': pos, 'spin': spin, 'color': color})
+    return psi, psibar
+
 def DiracGamma(mu, a, b, ):
     id = default.new()
     return Field(id, 'G', False, True, {'lorentz': mu, 'spin': a}) * Field(id, 'G', True, True, {'lorentz': mu, 'spin': b})
