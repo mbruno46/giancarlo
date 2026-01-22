@@ -1,21 +1,30 @@
 # See docs at: https://mystmd.org/guide/frontmatter
 version: 1
+
 project:
-  id: ac39103a-5939-48de-a03e-840e17bd9eab
   title: giancarlo
   description: Wick contractions in Python
-  # keywords: []
-  authors: ['Mattia Bruno']
+  authors: ['Mattia Bruno']  
   copyright: "2025 Mattia Bruno"
+  
   github: https://github.com/mbruno46/giancarlo
+  
   toc:
     - file: README.md
     - file: tutorials/symbols.ipynb
     - file: tutorials/basics.ipynb
+    - file: tutorials/fermions.ipynb
     - file: tutorials/hvp.ipynb
+  
 site:
   template: book-theme
-  # options:
+
+  # parts:
+    # banner: blabla
+    # primary_sidebar_footer: ''
+  # hide_title_block: true
+
+  options:
   #   favicon: favicon.ico
-  #   logo: site_logo.png
+    logo: ./logo/logo.png
   
