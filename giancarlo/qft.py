@@ -78,7 +78,7 @@ class Propagator(Base):
         if fx.tag=='G':
             self.tag = r'\gamma'
         else:
-            self.tag = f'S_{fx.tag}'
+            self.tag = f'S_{{{fx.tag}}}'
         
         self.index = {}
         for key in fx.index:

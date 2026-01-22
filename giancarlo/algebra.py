@@ -347,11 +347,11 @@ class CNumber(Base):
             self.denominator = denominator // gcd
         else:
             for key in ['numerator', 'denominator']:
-                number = snap_int(locals()[key])
+                number = locals()[key]
                 if isinstance(number, complex):
                     setattr(self, key, number.real if number.imag==0.0 else number)
                 else:
-                    setattr(self, key, number)
+                    setattr(self, key, snap_int(number))
 
         if isinstance(self.numerator, complex):
             self.negative = False
