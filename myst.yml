@@ -12,9 +12,10 @@ project:
   toc:
     - file: README.md
     - file: tutorials/symbols.ipynb
-    - file: tutorials/basics.ipynb
+    - file: tutorials/scalars.ipynb
     - file: tutorials/fermions.ipynb
     - file: tutorials/hvp.ipynb
+    - file: tutorials/quarks.ipynb
   
   edit_url: null
 

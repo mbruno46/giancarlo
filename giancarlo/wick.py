@@ -136,13 +136,29 @@ def build_trace(expr, Trace_class, indices):
     traces = []
     stack = []
 
+    def eq_up_to_none(list1, list2):
+        print(list1, list2)
+        return all(
+            (a is None or b is None or a == b)
+            for a, b in zip(list1, list2)
+        )
+    
+    def pass_index_over(idx0, idx1):
+        return [idx0[i] if val is None else val for i, val in enumerate(idx1)]
+
+
     # here we assume indices appear in pairs
     def DFS(idx):
         for i, f in enumerate(expr.factors):
             if i not in stack:
                 if ([f[idx][0] for idx in indices] == idx):
+                # idx0 = [f[idx][0] for idx in indices]
+                # idx1 = [f[idx][1] for idx in indices]
+                # print(idx0, idx1, idx, pass_index_over(idx, idx0))
+                # if pass_index_over(idx, idx0) == idx:
                     traces[-1] *= f
                     stack.append(i)
+                    # DFS(pass_index_over(idx0, idx1))
                     DFS([f[idx][1] for idx in indices])
 
     for i, f in enumerate(expr.factors):

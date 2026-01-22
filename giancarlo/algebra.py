@@ -299,7 +299,6 @@ class Trace(Base):
     def __init__(self, indices: list):
         self.factors = []
         self.indices = indices
-        # self.sign = CNumber(-1) if 'spin' in indices else None
         
     def __imul__(self, other):
         self.factors.append(other)
@@ -319,9 +318,6 @@ class Trace(Base):
         indices0 = [self.factors[0].fx[idx] for idx in self.indices]
         indices1 = [self.factors[-1].fy[idx] for idx in self.indices]
         if indices0 == indices1:
-            # if self.sign:
-            #     return self.sign * self
-            # else:
             return self
         return Product(self.factors)
     

@@ -146,9 +146,10 @@ class Diagram:
             )
         self.ax.add_patch(patch)
 
-    def tadpole(self, x, s):
+    def tadpole(self, x, s, nl):
         x1, x2 = x
-        patch = Circle((x1+0.3, x2), radius=0.3, fill=False)
+        r = 0.3 + 0.1 * nl
+        patch = Circle((x1+r, x2), radius=r, fill=False)
         self.ax.add_patch(patch)
 
     def draw_connected_diagram(self, idx, propagators):
@@ -165,10 +166,10 @@ class Diagram:
             x, y = p.fx['pos'], p.fy['pos']
             s = p.linestyle
             if x==y:
-                self.tadpole(pts[x], s)
+                self.tadpole(pts[x], s, pts.nlines[x])
             else:
                 self.line(pts[x], pts[y], s, pts.nlines[x])
-                pts.add_line(x)
+            pts.add_line(x)
 
         for x in pts:
             self.draw_point(pts[x], x)
