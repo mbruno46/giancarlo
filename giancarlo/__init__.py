@@ -24,40 +24,42 @@ __all__.extend(qft.__all__)
 __all__.extend(utils.__all__)
 __all__.extend(draw.__all__)
 
-def ScalarField(flavor):
+def RealScalarField(flavor):
     id = default.new()
     def phi(pos):
-        return Field(id, flavor, False, True, {'pos': pos})
+        return RealField(id, flavor, {'pos': pos})
+    return phi
+  
+def ComplexScalarField(flavor):
+    id = default.new()
+    def phi(pos):
+        return ComplexField(id, flavor, False, True, {'pos': pos})
     def phidag(pos):
-        return Field(id, rf'{{{flavor}}}^\dagger', True, True, {'pos': pos})
+        return ComplexField(id, rf'{{{flavor}}}^\dagger', True, True, {'pos': pos})
     return phi, phidag
 
 def PhotonField():
     id = default.new()
-    def a(pos, mu):
-        return Field(id, 'A', False, True, {'pos': pos, 'lorentz': mu}, linestyle='squiggle')
-    def adag(pos, mu):
-        return Field(id, 'Adag', True, True, {'pos': pos, 'lorentz': mu})
     def A(pos, mu):
-        return a(pos, mu) + adag(pos,mu)
+        return RealField(id, 'A', {'pos': pos, 'lorentz': mu}, linestyle='squiggle')
     return A
 
 def SpinorField(flavor):
     id = default.new()
     def psi(pos, spin):
-        return Field(id, flavor, False, False, {'pos': pos, 'spin': spin})
+        return ComplexField(id, flavor, False, False, {'pos': pos, 'spin': spin})
     def psibar(pos, spin):
-        return Field(id, rf'\bar{{{flavor}}}', True, False, {'pos': pos, 'spin': spin})
+        return ComplexField(id, rf'\bar{{{flavor}}}', True, False, {'pos': pos, 'spin': spin})
     return psi, psibar
 
 def QuarkField(flavor):
     id = default.new()
     def psi(pos, spin, color):
-        return Field(id, flavor, False, False, {'pos': pos, 'spin': spin, 'color': color})
+        return ComplexField(id, flavor, False, False, {'pos': pos, 'spin': spin, 'color': color})
     def psibar(pos, spin, color):
-        return Field(id, rf'\bar{{{flavor}}}', True, False, {'pos': pos, 'spin': spin, 'color': color})
+        return ComplexField(id, rf'\bar{{{flavor}}}', True, False, {'pos': pos, 'spin': spin, 'color': color})
     return psi, psibar
 
-def DiracGamma(mu, a, b, ):
+def DiracGamma(mu, a, b):
     id = default.new()
-    return Field(id, 'G', False, True, {'lorentz': mu, 'spin': a}) * Field(id, 'G', True, True, {'lorentz': mu, 'spin': b})
+    return ComplexField(id, 'G', False, True, {'lorentz': mu, 'spin': a}) * ComplexField(id, 'G', True, True, {'lorentz': mu, 'spin': b})

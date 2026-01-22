@@ -15,6 +15,7 @@
 __all__ = [
     "default",
     "log",
+    "print"
 ]
 
 def inside_ipython():
@@ -61,3 +62,8 @@ class Log:
         self.caller(x)
 
 log = Log()
+
+def print(*args):
+    from IPython.display import display, Math
+    display(Math(rf'[\text{{giancarlo}}] : {" ".join(str(a) for a in args)}'))
+  

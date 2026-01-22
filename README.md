@@ -6,6 +6,10 @@ It provides tools to represent and manipulate creation and annihilation operator
 
 **License:** GPL-3.0 ([LICENSE](https://github.com/mbruno46/giancarlo/blob/main/LICENSE))
 
+## Authors
+
+Mattia Bruno, maintainer
+Francesca A. Bresciani, co-developer
 
 ## Features
 

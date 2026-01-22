@@ -18,16 +18,16 @@ from .algebra import Base
 from .utils import default, log
 
 __all__ = [
-    "Field",
+    "RealField",
+    "ComplexField",
     "Propagator",
 ]
 
-class Field(Base):
-    def __init__(self, id: int, tag: str, anti: bool, boson: bool, index: dict = {}, linestyle = 'default'):
+class RealField(Base):
+    def __init__(self, id: int, tag: str, index: dict = {}, linestyle = 'default'):
         self.id = id
         self.tag = tag
-        self.anti = anti
-        self.boson = boson
+        self.boson = True
         self.index = index
         self.linestyle = linestyle
 
@@ -41,21 +41,40 @@ class Field(Base):
             return self.index[idx]
         return None
         
-    def can_be_contracted(self, other: Field):
+    def can_be_contracted(self, other):
+        return self.id == other.id
+
+    def contract(self, other):
+        p = Propagator(self, other)
+        p.symmetric = True
+        p.linestyle = self.linestyle
+        return p
+
+class ComplexField(RealField):
+    def __init__(self, id: int, tag: str, anti: bool, boson: bool, index: dict = {}, linestyle = 'default'):
+        self.id = id
+        self.tag = tag
+        self.anti = anti
+        self.boson = boson
+        self.index = index
+        self.linestyle = linestyle
+        
+    def can_be_contracted(self, other):
         if self.id == other.id:
             return not self.anti and other.anti
         return False
 
-    def contract(self, other: Field):
+    def contract(self, other):
         p = Propagator(self, other)
         p.linestyle = self.linestyle
         return p
-    
+            
 class Propagator(Base):
     def __init__(self, fx, fy):
         self.fx = fx
         self.fy = fy
-        
+        self.symmetric = False
+
         if fx.tag=='G':
             self.tag = r'\gamma'
         else:

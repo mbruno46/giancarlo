@@ -254,8 +254,8 @@ class Sum(Base):
             for k, (_, d) in data.items():
                 for s in symmetries_combined:
                     count = 0
-                    for element in s(d).factors:
-                        if element in expr:
+                    for element in d.factors:
+                        if s(element) in expr:
                             count += 1
                     if count == len(d):
                         data[k][0] += p
@@ -358,36 +358,6 @@ class CNumber(Base):
         else:
             self.negative = self.numerator * self.denominator < 0
 
-        # if denominator == 1.0:
-        #     self.denominator = 1.0
-        #     if isinstance(self.numerator, complex):
-        #         if (numerator.imag!=0.0):
-        #             self.numerator = numerator
-        #             self.negative = False
-        #             self.repr = f'{self.numerator}'
-        #         else:
-        #             self.numerator = numerator.real
-        #             self.negative = self.numerator * self.denominator < 0
-        #             sign = '-' if self.negative else ''
-        #             self.repr = f'{sign}{abs(self.numerator)}'
-        #     else:
-        #         self.numerator = numerator
-        #         self.negative = self.numerator * self.denominator < 0
-        #         sign = '-' if self.negative else ''
-        #         self.repr = f'{sign}{abs(self.numerator) if not self.numerator in (1.0, -1.0) else ""}'
-        # else:
-        #     if isinstance(denominator, int) and isinstance(numerator, int):
-        #         gcd = math.gcd(numerator, denominator)
-        #         self.numerator = numerator // gcd
-        #         self.denominator = denominator // gcd
-        #     else:
-        #         self.numerator = numerator
-        #         self.denominator = denominator
-
-        #     self.negative = self.numerator * self.denominator < 0
-        #     sign = '-' if self.negative else ''
-        #     self.repr = rf'{sign}\frac{{{abs(self.numerator)}}}{{{self.denominator}}}'
-
     def __add__(self, other):
         if isinstance(other, CNumber):
             return CNumber(self.numerator*other.denominator + self.denominator*other.numerator, self.denominator*other.denominator)
@@ -407,8 +377,10 @@ class CNumber(Base):
         if self.denominator==1.0:
             if self.numerator in (1.0, -1.0):
                 return f'{sign}'
+            if isinstance(self.numerator, complex):
+                return f'{self.numerator}'
             return f'{sign}{abs(self.numerator)}'
-        return rf'\frac{{{self.numerator}}}{{{self.denominator}}}'
+        return rf'{sign}\frac{{{abs(self.numerator)}}}{{{self.denominator}}}'
 
     def reduce(cnumbers: list) -> list:
         if not cnumbers:
@@ -477,28 +449,6 @@ class Counter:
         return [self.data[key] for key in self.count]
     
 
-# class Topologies:
-#     def __init__(self, expr, *indices):
-#         self.coeff = []
-#         self.topo = []
-
-#         for i in indices:
-#             coeff, topo = None, None
-#             for j in i:
-#                 if coeff is None:
-#                     coeff, topo = expr[j].safe_split()
-#                 else:
-#                     coeff += expr[j].safe_split()[0]
-#             self.coeff.append(coeff)
-#             self.topo.append(topo)
-
-#     def draw(self, i=None):
-#         if i is None:
-#             for i in range(len(self.coeff)):
-#                 self.draw(i)
-#         else:
-#             self.topo[i].draw(self.coeff[i]._repr_latex_())
-
 class GenericSymmetry:
     def __init__(self, symmetries):
         self.symmetries = symmetries
@@ -517,7 +467,11 @@ class ExchangeSymmetry:
     def __init__(self, **kwargs):
         self.kwargs = kwargs
 
-    def __call__(self, target: Product):
+    def __call__(self, target):
+        # if propagator is already symmetric no need to apply symmetry
+        if hasattr(target, 'symmetric'):
+            if target.symmetric:
+                return target
         r1 = {}
         r2 = {}
         r3 = {}
