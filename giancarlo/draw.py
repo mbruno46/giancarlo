@@ -29,17 +29,7 @@ __all__ = [
     "PlotStyle"
 ]
 
-def fill_points_circle(d: dict, radius=1.0, center=(0.0, 0.0)):
-    cx, cy = center
-    n = len(d)
 
-    for i, k in enumerate(d.keys()):
-        angle = 2 * math.pi * i / n
-        x = cx + radius * math.cos(angle)
-        y = cy + radius * math.sin(angle)
-        d[k] = (x, y)
-
-    return
 
 
 def squiggle_patch(p0, p1, n_periods=5, amp=0.05, n_points=300, **patch_kwargs):
@@ -87,6 +77,38 @@ class PlotStyle:
 
 PlotStyle.points['default'] = PlotStyle.point()
 
+class Points:
+    def __init__(self):
+        self.pts = {}
+        self.nlines = {}
+
+    def init(self, name):
+        if not name in self.pts:
+            self.pts[name] = None
+            self.nlines[name] = 0
+
+    def add_line(self, name):
+        self.nlines[name] += 1
+
+    def __getitem__(self, name):
+        return self.pts[name]
+    
+    def __iter__(self):
+        for p in self.pts:
+            yield p
+
+    def fill_points_circle(self, radius=1.0, center=(0.0, 0.0)):
+        cx, cy = center
+        n = len(self.pts)
+
+        for i, k in enumerate(self.pts):
+            angle = 2 * math.pi * i / n
+            x = cx + radius * math.cos(angle)
+            y = cy + radius * math.sin(angle)
+            self.pts[k] = (x,y)
+
+        return
+    
 class Diagram:
     def __init__(self, nconn):
         plt.style.use(PlotStyle.style)
@@ -95,16 +117,10 @@ class Diagram:
         self.ax.axis('off')
 
         self.nconn = nconn
-        self.pts = {}
+        self.pts = Points()
         for i in range(nconn):
-            self.pts[i] = None
-        fill_points_circle(self.pts, radius=1)
-        self.idx = -1
-    
-    def new(self):
-        if self.idx<self.nconn:
-            self.idx += 1
-
+            self.pts.init(i)
+        self.pts.fill_points_circle()
 
     def draw_point(self, pt, x):
         style = PlotStyle.points[x] if x in PlotStyle.points else PlotStyle.points['default']
@@ -113,22 +129,18 @@ class Diagram:
         self.ax.text(*pt, f'  ${x}$')
 
 
-    def __call__(self, title=''):
-        for x in self.pts:
-            if type(x) is str:
-                self.draw_point(self.pts[x], x)
-        
+    def __call__(self, title=''):        
         self.ax.set_title(title)
         self.fig.tight_layout()
 
-    def line(self, x, y, s):
+    def line(self, x, y, s, nl):
         ls = PlotStyle.linestyles[s] if s in PlotStyle.linestyles else PlotStyle.linestyles['default']
         if s=='squiggle':
             patch = squiggle_patch(x, y)
         elif s=='default':
             patch = FancyArrowPatch(
                 x, y,
-                connectionstyle=f"arc3,rad={0.3}",
+                connectionstyle=f"arc3,rad={0.3 + 0.1 * nl}",
                 arrowstyle='-',
                 ls=ls
             )
@@ -139,27 +151,27 @@ class Diagram:
         patch = Circle((x1+0.3, x2), radius=0.3, fill=False)
         self.ax.add_patch(patch)
 
-    def draw_connected_diagram(self, propagators):
-        self.new()
-        pts = {}
+    def draw_connected_diagram(self, idx, propagators):
+        pts = Points()
 
         for p in propagators:
             x, y = p.fx['pos'], p.fy['pos']
-            if not x in self.pts:
-                pts[x] = None
-            if not y in self.pts:
-                pts[y] = None
+            pts.init(x)
+            pts.init(y)
 
-        fill_points_circle(pts, radius=0.5, center=self.pts[self.idx])
-
-        for pt in pts:
-            self.pts[pt] = pts[pt]
-        del pts
-
+        pts.fill_points_circle(radius=0.5, center=self.pts[idx])
+        
         for p in propagators:
             x, y = p.fx['pos'], p.fy['pos']
             s = p.linestyle
             if x==y:
-                self.tadpole(self.pts[x], s)
+                self.tadpole(pts[x], s)
             else:
-                self.line(self.pts[x], self.pts[y], s)
+                self.line(pts[x], pts[y], s, pts.nlines[x])
+                pts.add_line(x)
+
+        for x in pts:
+            self.draw_point(pts[x], x)
+
+        del pts
+            

@@ -181,13 +181,13 @@ class Product(Base):
                 _no_traces.extend(f.factors)
             else:
                 _no_traces.append(f)
-        # keep only propagators
+        # keep only physical propagators
         _props = [p for p in _no_traces if p['pos']!=(None,None)]
         connected = build_trace(Product(_props), Trace, indices=['pos'])
         
         g = Diagram(len(connected))
-        for conn in connected:
-            g.draw_connected_diagram(conn.factors)
+        for i, conn in enumerate(connected):
+            g.draw_connected_diagram(i, conn.factors)
         g(self._repr_latex_() if title=='' else title)
 
     def trace(self, indices = []):

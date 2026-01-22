@@ -30,3 +30,4 @@ site:
   options:
   #   favicon: favicon.ico
     logo_text: 'giancarlo'
+    use_edit_page_button: False
