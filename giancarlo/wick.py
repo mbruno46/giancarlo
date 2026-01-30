@@ -13,6 +13,7 @@
 #
 
 from itertools import permutations
+from collections import Counter
 from .utils import default, log
 
 class Contraction:
@@ -94,7 +95,14 @@ def wick_fields_fast(factors):
         for f in remaining:
             s *= f.sign
         return s
-    
+
+    # fcon = {}
+    # for i, f0 in enumerate(factors):
+    #     fcon[i] = []
+    #     for j, f1 in enumerate(factors):
+    #         if (i!=j) and f0.can_be_contracted(f1):
+    #             fcon[i].append(j)
+
     def backtrack(remaining, paired, sign = 1):
         if not remaining:
             _c = Contraction(factors, list(paired), sign)
@@ -104,13 +112,23 @@ def wick_fields_fast(factors):
                     contractions.append(_c)
             return 
         
-        for j in range(len(remaining)):
-            f0 = remaining[j]
+        # for jr, j in enumerate(remaining):
+        #     for ir, i in enumerate(set(fcon[j]) & set(remaining)):
+        #         paired.append((j,i))
+        #         _sign = 1
+        #         if not factors[j].boson:
+        #             if ir>jr:
+        #                 _sign = get_sign(remaining[jr+1:ir])
+        #             else:
+        #                 _sign = get_sign(remaining[ir+1:jr+1])
+                
+        #         backtrack([k for k in remaining if k not in (i, j)], paired, sign * _sign)
+        #         paired.pop()
 
-            for i in range(len(remaining)):
+        for j, f0 in enumerate(remaining):
+            for i, f1 in enumerate(remaining):
                 if i==j:
                     continue
-                f1 = remaining[i]
 
                 if f0.can_be_contracted(f1):
                     i0 = factors.index(f0)
@@ -152,14 +170,14 @@ def build_trace(expr, Trace_class, indices):
         for i, f in enumerate(expr.factors):
             if i not in stack:
                 if ([f[idx][0] for idx in indices] == idx):
-                # idx0 = [f[idx][0] for idx in indices]
-                # idx1 = [f[idx][1] for idx in indices]
-                # print(idx0, idx1, idx, pass_index_over(idx, idx0))
-                # if pass_index_over(idx, idx0) == idx:
                     traces[-1] *= f
                     stack.append(i)
-                    # DFS(pass_index_over(idx0, idx1))
                     DFS([f[idx][1] for idx in indices])
+                else:
+                    if (f.symmetric) and ([f[idx][1] for idx in indices] == idx):
+                        traces[-1] *= f
+                        stack.append(i)
+                        DFS([f[idx][0] for idx in indices])
 
     for i, f in enumerate(expr.factors):
         if i not in stack:
@@ -167,3 +185,79 @@ def build_trace(expr, Trace_class, indices):
             DFS([f[idx][0] for idx in indices])
 
     return [t() for t in traces]
+
+    
+
+class ConnectedSet:
+    # class IndexStack:
+    #     def __init__(self, val):
+    #         self.data = {}
+    #         for key in val:
+    #             self.data[key] = [val[key]]
+
+    #     def append(self, val):
+    #         for key in self.data:
+    #             self.data[key] += val[key]
+
+    def __init__(self, i, ix, iy):
+        self.indices = [{key: [ix[key]] for key in ix}, {key: [iy[key]] for key in iy}]
+        self.idx = [i]
+
+    def append(self, i, *val):
+        for j, v in enumerate(val):
+            for key in v:
+                self.indices[j][key].append(v[key])
+        self.idx.append(i)
+
+    def contains(self, j, val):
+        return all(v in self.indices[j][k] for k, v in val.items() if not v is None)
+
+    @property
+    def closed(self):        
+        def inner(key):
+            cx = Counter(self.indices[0][key])
+            cy = Counter(self.indices[1][key])
+            if (None in cy) and (cy[None] == len(self.indices[1][key])):
+                return False
+            for iy in self.indices[1][key]:
+                if cx[iy] == 0:
+                    return False
+            return True
+        return all(inner(key) for key in self.indices[1])
+    
+    def __call__(self, factors):
+        return [factors[i] for i in self.idx], self.closed
+
+def split_connected(expr, indices, pairs_only = True):
+    stack = []
+
+    def get_indices(prop, i):
+        return {idx: prop[idx][i] for idx in indices}
+    
+    for i, f in enumerate(expr.factors):
+        # ix, iy = f[index][0], f[index][1]
+        i0 = get_indices(f, 0)
+        i1 = get_indices(f, 1)
+
+        istack = len(stack)
+        for j, c in enumerate(stack):
+            if pairs_only:
+                print(i0, c.indices[1], c.contains(1, i0))
+                if (c.contains(1, i0)):
+                    istack = j    
+                    break
+                if (f.symmetric and c.contains(1, i1)):
+                    istack = j
+                    f.swap()
+                    break
+            else:
+                if (c.contains(1, i0) or c.contains(1, i1) or c.contains(0, i0)):
+                    istack = j
+                    break
+
+        if istack < len(stack):
+            stack[istack].append(i, i0, i1)
+        else:
+            stack.append(ConnectedSet(i, i0, i1))
+
+    return [s(expr.factors) for s in stack]

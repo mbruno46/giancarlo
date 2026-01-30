@@ -113,3 +113,8 @@ class Propagator(Base):
                 if rdict[idx][0] == self.index[idx][1]:
                     self.index[idx][1] = rdict[idx][1]
 
+    def swap(self):
+        if self.symmetric:
+            self.fx, self.fy = self.fy, self.fx
+            for val in self.index.values():
+                val[0], val[1] = val[1], val[0]

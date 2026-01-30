@@ -16,7 +16,7 @@ from copy import deepcopy
 from itertools import permutations, combinations
 import math
 
-from .utils import *
+# from .utils import *
 from .wick import *
 from .draw import *
 from .utils import default
@@ -183,16 +183,20 @@ class Product(Base):
                 _no_traces.append(f)
         # keep only physical propagators
         _props = [p for p in _no_traces if p['pos']!=(None,None)]
-        connected = build_trace(Product(_props), Trace, indices=['pos'])
-        
+        # connected = build_trace(Product(_props), Trace, indices=['pos'])
+        connected = split_connected(Product(_props), ['pos'], pairs_only=False)
+
         g = Diagram(len(connected))
-        for i, conn in enumerate(connected):
-            g.draw_connected_diagram(i, conn.factors)
+        for i, (conn, _) in enumerate(connected):
+            g.draw_connected_diagram(i, conn)
         g(self._repr_latex_() if title=='' else title)
 
     def trace(self, indices = []):
-        tr = build_trace(Product(self.data), Trace, indices)
-        return self.prefactor * Product(tr)
+        result = self.prefactor
+        for factors, closed in split_connected(Product(self.data), indices):
+            result *= Trace(factors, indices) if closed else Product(factors)
+        return result
+
     
     def permutations(self):
         assert sum([f.sign for f in self.factors]) == len(self.factors)
@@ -203,6 +207,35 @@ class Product(Base):
         A = other.cyclic_permutations() if isinstance(other, Trace) else [str(other)]
         B = [str(f) for f in self.factors]
         return bool(set(A) & set(B))
+
+
+class Trace(Base):
+    def __init__(self, factors: list, indices: list):
+        self.factors = factors
+        self.indices = indices
+        
+    def __imul__(self, other):
+        self.factors.append(other)
+        return self
+    
+    def __str__(self):
+        tag = ' '.join(rf'\mathrm{{Tr}}_\mathrm{{{idx}}}' for idx in self.indices if idx!='pos')
+        for idx in self.indices:
+            default.verbose[idx] = False
+        s = f'{tag} [ {Product(self.factors)} ]'
+        for idx in self.indices:
+            default.verbose[idx] = True
+        return s
+    
+    def cyclic_permutations(self):
+        out = []
+        for i in range(len(self.factors)):
+            t = Trace(self.indices)
+            t.factors = self.factors[i:] + self.factors[:i]
+            out.append(str(t))
+            del t
+        return out
+    
 
 class Sum(Base):
     def __init__(self, factors = []):
@@ -295,7 +328,7 @@ class Sum(Base):
         for f in self.factors:
             f.draw()
 
-class Trace(Base):
+class Trace2(Base):
     def __init__(self, indices: list):
         self.factors = []
         self.indices = indices
