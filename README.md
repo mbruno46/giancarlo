@@ -8,8 +8,10 @@ It provides tools to represent and manipulate creation and annihilation operator
 
 ## Authors
 
-Mattia Bruno, maintainer
-Francesca A. Bresciani, co-developer
+- Mattia Bruno, maintainer
+- Francesca A. Bresciani
+
+We would like to thank C. Lehner and J. Parrino who authored similar packages and shared very useful insights and comments.
 
 ## Features
 
