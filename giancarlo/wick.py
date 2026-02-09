@@ -14,6 +14,8 @@
 
 from itertools import permutations
 from collections import Counter
+from functools import reduce
+from operator import mul
 from .utils import default, log
 
 class Contraction:
@@ -90,6 +92,41 @@ def wick_fields_fast(factors):
     contractions = []
     stack = []
 
+    signs = [f.sign for f in factors]
+    pairing = {}
+    for i, f0 in enumerate(factors):
+        pairing[i] = []
+        for j, f1 in enumerate(factors):
+            if (i!=j) and f0.can_be_contracted(f1):
+                pairing[i].append(j)
+
+    def backtrack(remaining, paired, sign = 1):
+        if not remaining:
+            _c = Contraction(factors, list(paired), sign)
+            if _c.fully_contracted:
+                if _c.tag not in stack:
+                    stack.append(_c.tag)
+                    contractions.append(_c)
+            return 
+    
+        for i in remaining:
+            for j in set(pairing[i]) & set(remaining):
+                paired.append((i,j))
+                _sign = 1
+                if not factors[i].boson:
+                    idx = range(remaining.index(i)+1, remaining.index(j)) if j>i else range(remaining.index(j)+1, remaining.index(i)+1) 
+                    _sign = reduce(mul, [signs[remaining[_idx]] for _idx in idx], 1)
+
+                backtrack([k for k in remaining if k not in (i, j)], paired, sign * _sign)
+                paired.pop()
+
+    backtrack(list(range(len(factors))), [])
+    return contractions
+
+def wick_fields_fast_v0(factors):
+    contractions = []
+    stack = []
+
     def get_sign(remaining):
         s = 1
         for f in remaining:
@@ -110,6 +147,7 @@ def wick_fields_fast(factors):
                 if _c.tag not in stack:
                     stack.append(_c.tag)
                     contractions.append(_c)
+                    print(len(contractions))
             return 
         
         # for jr, j in enumerate(remaining):
@@ -188,7 +226,7 @@ def build_trace(expr, Trace_class, indices):
 
     
 
-class ConnectedSet:
+class ConnectedSet_v0:
     # class IndexStack:
     #     def __init__(self, val):
     #         self.data = {}
@@ -210,7 +248,7 @@ class ConnectedSet:
         self.idx.append(i)
 
     def contains(self, j, val):
-        return all(v in self.indices[j][k] for k, v in val.items() if not v is None)
+        return all(v in self.indices[j][k] for k, v in val.items()) # if not v is None)
 
     @property
     def closed(self):        
@@ -228,7 +266,7 @@ class ConnectedSet:
     def __call__(self, factors):
         return [factors[i] for i in self.idx], self.closed
 
-def split_connected(expr, indices, pairs_only = True):
+def split_connected_v0(expr, indices, pairs_only = True):
     stack = []
 
     def get_indices(prop, i):
@@ -242,7 +280,7 @@ def split_connected(expr, indices, pairs_only = True):
         istack = len(stack)
         for j, c in enumerate(stack):
             if pairs_only:
-                print(i0, c.indices[1], c.contains(1, i0))
+                #print(i0, c.indices[1], c.contains(1, i0))
                 if (c.contains(1, i0)):
                     istack = j    
                     break
@@ -259,5 +297,38 @@ def split_connected(expr, indices, pairs_only = True):
             stack[istack].append(i, i0, i1)
         else:
             stack.append(ConnectedSet(i, i0, i1))
+
+    return [s(expr.factors) for s in stack]
+
+class ConnectedSet:
+    def __init__(self, i):
+        self.fidx = []
+        self.append(i)
+
+    def append(self, i):
+        self.fidx.append(i)
+
+    def __call__(self, factors):
+        return [factors[i] for i in self.fidx]
+
+def split_connected(expr, index):
+    stack = []
+    paired = []
+    
+    def backtrace(idx):
+        for i, f in enumerate(expr.factors):
+            if (i not in paired):
+                if (f.symmetric and f[index][1] == idx):
+                    f.swap()
+                if (f[index][0] == idx):
+                    stack[-1].append(i)
+                    paired.append(i)
+                    backtrace(f[index][1])
+
+    for i, f in enumerate(expr.factors):
+        if (i not in paired):
+            stack.append(ConnectedSet(i))
+            paired.append(i)
+            backtrace(f[index][1])
 
     return [s(expr.factors) for s in stack]

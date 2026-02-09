@@ -19,6 +19,7 @@ from matplotlib.path import Path
 import math
 
 plt.rcParams.update({
+    'text.usetex': True,
     'font.size': 14
 })
 

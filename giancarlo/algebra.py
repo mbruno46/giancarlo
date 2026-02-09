@@ -174,30 +174,36 @@ class Product(Base):
     def draw(self, title=''):
         # remove prefactors
         _data = [f for f in self.factors if not isinstance(f, (Sum, CNumber, Symbol))]
-        # remove traces
-        _no_traces = []
+        # remove tensorproducts
+        _no_tp = []
         for f in _data:
-            if isinstance(f, Trace):
-                _no_traces.extend(f.factors)
+            if isinstance(f, TensorProduct):
+                _no_tp.extend(f.factors)
             else:
-                _no_traces.append(f)
+                _no_tp.append(f)
         # keep only physical propagators
-        _props = [p for p in _no_traces if p['pos']!=(None,None)]
-        # connected = build_trace(Product(_props), Trace, indices=['pos'])
-        connected = split_connected(Product(_props), ['pos'], pairs_only=False)
+        _props = [p for p in _no_tp if p['pos']!=(None,None)]
+        connected = split_connected(Product(_props), 'pos')
 
         g = Diagram(len(connected))
-        for i, (conn, _) in enumerate(connected):
+        for i, conn in enumerate(connected):
             g.draw_connected_diagram(i, conn)
         g(self._repr_latex_() if title=='' else title)
 
-    def trace(self, indices = []):
+    # def trace(self, indices = []):
+    #     result = self.prefactor
+    #     for factors, closed in split_connected(Product(self.data), indices):
+    #         result *= Trace(factors, indices) if closed else Product(factors)
+    #     return result
+
+    def contract(self, index):
+        if not index:
+            return self
         result = self.prefactor
-        for factors, closed in split_connected(Product(self.data), indices):
-            result *= Trace(factors, indices) if closed else Product(factors)
+        for factors in split_connected(Product(self.data), index):
+            result *= TensorProduct(factors, index) if len(factors)>1 else factors[0]
         return result
 
-    
     def permutations(self):
         assert sum([f.sign for f in self.factors]) == len(self.factors)
         for p in permutations(self.factors):
@@ -206,8 +212,27 @@ class Product(Base):
     def __contains__(self, other):
         A = other.cyclic_permutations() if isinstance(other, Trace) else [str(other)]
         B = [str(f) for f in self.factors]
-        return bool(set(A) & set(B))
+        return bool(set(A) & set(B))    
 
+class TensorProduct(Base):
+    def __init__(self, factors: list, index):
+        self.factors = factors
+        self.index = index
+        self.open_indices = (factors[0][index][0], factors[-1][index][1])
+        a, b = self.open_indices
+        if a==b:
+            self.repr_0 = rf'\mathrm{{Tr}}_\mathrm{{{index}}} \big['
+            self.repr_1 = rf' \big]'
+        else:
+            self.repr_0 = rf'\big['
+            self.repr_1 = rf' \big]({a},{b})'
+
+
+    def __str__(self):
+        default.verbose[self.index] = False
+        s = str(Product(self.factors))
+        default.verbose[self.index] = True
+        return self.repr_0 + s + self.repr_1
 
 class Trace(Base):
     def __init__(self, factors: list, indices: list):
@@ -230,10 +255,7 @@ class Trace(Base):
     def cyclic_permutations(self):
         out = []
         for i in range(len(self.factors)):
-            t = Trace(self.indices)
-            t.factors = self.factors[i:] + self.factors[:i]
-            out.append(str(t))
-            del t
+            out.append(str(Trace(self.factors[i:] + self.factors[:i], self.indices)))
         return out
     
 
@@ -317,6 +339,9 @@ class Sum(Base):
     def wick(self):
         return Sum([f.wick() for f in self.factors])
 
+    def contract(self, index):
+        return Sum([f.contract(index) for f in self.factors])
+    
     def trace(self, indices = []):
         return Sum([f.trace(indices) for f in self.factors])
     

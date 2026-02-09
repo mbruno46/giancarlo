@@ -28,6 +28,7 @@ def inside_ipython():
 class default:
     field_id = 0
     var_id = 0
+    indices = ['spin', 'lorentz', 'color']
     verbose = {
         'pos': True,
         'spin': True,
