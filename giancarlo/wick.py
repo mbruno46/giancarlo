@@ -332,3 +332,34 @@ def split_connected(expr, index):
             backtrace(f[index][1])
 
     return [s(expr.factors) for s in stack]
+
+def topologies(expr):
+    fmap = {i: f['pos'] for i, f in enumerate(expr.factors)}
+
+    pmap = {}
+    for i, positions in fmap.items():
+        for p in positions:
+            pmap.setdefault(p, []).append(i)
+
+    visited = set()
+    connected = []
+
+    def explore(i, c):
+        visited.add(i)
+        c.append(i)
+
+        # For every position of this factor
+        for p in fmap[i]:
+            # Visit all factors sharing that position
+            for j in pmap[p]:
+                if j not in visited:
+                    explore(j, c)
+
+    for i in fmap:
+        if i not in visited:
+            c = []
+            explore(i, c)
+            connected.append(c)
+
+    # Return actual factors grouped by topology
+    return [[expr.factors[i] for i in c] for c in connected]

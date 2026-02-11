@@ -143,12 +143,6 @@ class Product(Base):
     def prefactor(self):
         return Product(self.cnum + self.symb + self.sum)
     
-    # def safe_split(self):
-    #     if not self.cnum and not self.symb:
-    #         if isinstance(self.data[0], Sum):
-    #             return self.data[0], Product(self.data[1:])
-    #     return self.prefactor, Product(self.data)
-    
     @property
     def size(self):
         return len(self.factors)
@@ -183,7 +177,7 @@ class Product(Base):
                 _no_tp.append(f)
         # keep only physical propagators
         _props = [p for p in _no_tp if p['pos']!=(None,None)]
-        connected = split_connected(Product(_props), 'pos')
+        connected = topologies(Product(_props)) #, 'pos')
 
         g = Diagram(len(connected))
         for i, conn in enumerate(connected):
@@ -227,13 +221,21 @@ class TensorProduct(Base):
             self.repr_0 = rf'\big['
             self.repr_1 = rf' \big]({a},{b})'
 
-
     def __str__(self):
         default.verbose[self.index] = False
         s = str(Product(self.factors))
         default.verbose[self.index] = True
         return self.repr_0 + s + self.repr_1
 
+    def __getitem__(self, idx):
+        if idx == self.index:
+            return self.open_indices
+        conn = split_connected(Product(self.factors), idx)
+        print('a ', conn)
+        if len(conn)==1:
+            return conn[0][idx][0], conn[0][idx][1]
+        return None
+    
 class Trace(Base):
     def __init__(self, factors: list, indices: list):
         self.factors = factors
