@@ -171,7 +171,7 @@ class Product(Base):
         # remove tensorproducts
         _no_tp = []
         for f in _data:
-            if isinstance(f, TensorProduct):
+            if isinstance(f, ContractedProduct):
                 _no_tp.extend(f.factors)
             else:
                 _no_tp.append(f)
@@ -195,7 +195,7 @@ class Product(Base):
             return self
         result = self.prefactor
         for factors in split_connected(Product(self.data), index):
-            result *= TensorProduct(factors, index) if len(factors)>1 else factors[0]
+            result *= ContractedProduct(factors, index)
         return result
 
     def permutations(self):
@@ -204,63 +204,58 @@ class Product(Base):
             yield Product(list(p))
 
     def __contains__(self, other):
-        A = other.cyclic_permutations() if isinstance(other, Trace) else [str(other)]
+        A = other.cyclic_permutations() if isinstance(other, ContractedProduct) else [str(other)]
         B = [str(f) for f in self.factors]
         return bool(set(A) & set(B))    
 
-class TensorProduct(Base):
+class ContractedProduct(Base):
     def __init__(self, factors: list, index):
-        self.factors = factors
+        self.factors = list(factors)
         self.index = index
-        self.open_indices = (factors[0][index][0], factors[-1][index][1])
-        a, b = self.open_indices
+        a, b = None, None
+        for f in factors:
+            if not f[index][0] is None:
+                if a is None:
+                    a = f[index][0]
+            if not f[index][1] is None:
+                b = f[index][1] 
+        self.open_indices = (a, b)
         if a==b:
-            self.repr_0 = rf'\mathrm{{Tr}}_\mathrm{{{index}}} \big['
-            self.repr_1 = rf' \big]'
+            if not a is None:
+                self.repr_0 = rf'\mathrm{{Tr}}_\mathrm{{{index}}} \big['
+                self.repr_1 = rf' \big]'
+            else:
+                self.repr_0 = self.repr_1 = ''
         else:
             self.repr_0 = rf'\big['
             self.repr_1 = rf' \big]({a},{b})'
 
     def __str__(self):
         default.verbose[self.index] = False
-        s = str(Product(self.factors))
+        s = str(Product([f.stripe(self.index) for f in self.factors]))
         default.verbose[self.index] = True
         return self.repr_0 + s + self.repr_1
 
     def __getitem__(self, idx):
         if idx == self.index:
             return self.open_indices
-        conn = split_connected(Product(self.factors), idx)
-        print('a ', conn)
+        conn = split_connected(Product([f for f in self.factors if not f[idx][0] is None]), idx)
         if len(conn)==1:
-            return conn[0][idx][0], conn[0][idx][1]
-        return None
+            return conn[0][0][idx][0], conn[0][-1][idx][1]
+        raise Exception(f'Did not manage to connect all indices of type {idx}')
     
-class Trace(Base):
-    def __init__(self, factors: list, indices: list):
-        self.factors = factors
-        self.indices = indices
-        
-    def __imul__(self, other):
-        self.factors.append(other)
-        return self
-    
-    def __str__(self):
-        tag = ' '.join(rf'\mathrm{{Tr}}_\mathrm{{{idx}}}' for idx in self.indices if idx!='pos')
-        for idx in self.indices:
-            default.verbose[idx] = False
-        s = f'{tag} [ {Product(self.factors)} ]'
-        for idx in self.indices:
-            default.verbose[idx] = True
-        return s
-    
-    def cyclic_permutations(self):
-        out = []
-        for i in range(len(self.factors)):
-            out.append(str(Trace(self.factors[i:] + self.factors[:i], self.indices)))
-        return out
-    
+    def swap(self):
+        pass
 
+    def stripe(self, index):
+        return self
+
+    def cyclic_permutations(self):
+        a, b = self.open_indices
+        if a == b:
+            return [str(ContractedProduct(self.factors[i:] + self.factors[:i], self.index)) for i in range(len(self.factors))]
+        return [str(self)]
+    
 class Sum(Base):
     def __init__(self, factors = []):
         _factors = []
@@ -298,7 +293,7 @@ class Sum(Base):
     def simplify(self, *args):
         data = {}
         
-        symmetries = [IdentitySymmetry()] if not any(isinstance(x, IdentitySymmetry) for x in args) else []
+        symmetries = [IdentitySymmetry()]# if not any(isinstance(x, IdentitySymmetry) for x in args) else []
         symmetries.extend(list(args))
 
         symmetries_combined = [
@@ -317,19 +312,13 @@ class Sum(Base):
                     if count == len(d):
                         data[k][0] += p
                         return
-            # for perm_d in expr.permutations():
-            #     for s in symmetries:
-            #         k = str(s(perm_d))
-            #         if k in data:
-            #             data[k][0] += p
-            #             return
 
             k = str(expr)
             data[k] = [p, expr]
             return
         
         for f in self.factors:
-            p, d = f.prefactor, Product(f.data)                
+            p, d = f.prefactor, Product(f.data)
             add_to_data(p, d)
 
         if 'simplify' in default.debug:
@@ -355,40 +344,6 @@ class Sum(Base):
         for f in self.factors:
             f.draw()
 
-class Trace2(Base):
-    def __init__(self, indices: list):
-        self.factors = []
-        self.indices = indices
-        
-    def __imul__(self, other):
-        self.factors.append(other)
-        return self
-    
-    def __str__(self):
-        tag = ' '.join(rf'\mathrm{{Tr}}_\mathrm{{{idx}}}' for idx in self.indices if idx!='pos')
-        for idx in self.indices:
-            default.verbose[idx] = False
-        s = f'{tag} [ {Product(self.factors)} ]'
-        for idx in self.indices:
-            default.verbose[idx] = True
-        return s
-
-    # checks that trace effectively is closed, otherwise returns product
-    def __call__(self):
-        indices0 = [self.factors[0].fx[idx] for idx in self.indices]
-        indices1 = [self.factors[-1].fy[idx] for idx in self.indices]
-        if indices0 == indices1:
-            return self
-        return Product(self.factors)
-    
-    def cyclic_permutations(self):
-        out = []
-        for i in range(len(self.factors)):
-            t = Trace(self.indices)
-            t.factors = self.factors[i:] + self.factors[:i]
-            out.append(str(t))
-            del t
-        return out
     
 class CNumber(Base):
     def __init__(self, numerator, denominator=1):

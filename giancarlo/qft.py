@@ -118,3 +118,14 @@ class Propagator(Base):
             self.fx, self.fy = self.fy, self.fx
             for val in self.index.values():
                 val[0], val[1] = val[1], val[0]
+
+    def stripe(self, index):
+        prop = Propagator(self.fx, self.fy)
+        prop.symmetric = self.symmetric
+        prop.tag = self.tag
+        prop.index = {} # this is fixes issue of replace being called before stripe
+        for idx in self.index:
+            if not idx == index:
+                prop.index[idx] = self.index[idx]
+        return prop
+    

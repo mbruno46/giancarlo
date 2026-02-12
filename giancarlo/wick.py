@@ -314,11 +314,11 @@ class ConnectedSet:
 def split_connected(expr, index):
     stack = []
     paired = []
-    
+
     def backtrace(idx):
         for i, f in enumerate(expr.factors):
             if (i not in paired):
-                if (f.symmetric and f[index][1] == idx):
+                if (f[index][1] == idx):
                     f.swap()
                 if (f[index][0] == idx):
                     stack[-1].append(i)
