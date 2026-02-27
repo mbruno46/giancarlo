@@ -15,7 +15,7 @@
 from __future__ import annotations
 
 from .algebra import Base
-from .utils import default, log
+from .utils import default
 
 __all__ = [
     "RealField",

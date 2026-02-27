@@ -16,7 +16,7 @@ from itertools import permutations
 from collections import Counter
 from functools import reduce
 from operator import mul
-from .utils import default, log
+from .utils import default
 
 class Contraction:
     def __init__(self, fields, pairs = [], sign = 1):

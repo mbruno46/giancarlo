@@ -12,9 +12,10 @@
 # GNU General Public License for more details.
 #
 
+import builtins
+
 __all__ = [
     "default",
-    "log",
     "print"
 ]
 
@@ -35,7 +36,7 @@ class default:
         'lorentz': True,
         'color': True,
     }
-    debug = [] #'wick', 'simplify']
+    # debug = [] #'wick', 'simplify']
     latex = inside_ipython()
 
     @classmethod
@@ -49,22 +50,14 @@ class default:
         return f'x_{{{cls.var_id}}}'
 
 
-class Log:
-    def __init__(self):
-        self.debug = lambda x: print(f'[giancarlo] : {x}')
-
-        if default.latex:
-            from IPython.display import display, Math
-            self.caller = lambda x: display(Math(rf'[\text{{giancarlo}}] : {x}'))
-        else:
-            self.caller = self.debug        
-
-    def __call__(self, x):
-        self.caller(x)
-
-log = Log()
-
-def print(*args):
-    from IPython.display import display, Math
-    display(Math(rf'[\text{{giancarlo}}] : {" ".join(str(a) for a in args)}'))
-  
+def init_printer():
+    if inside_ipython():
+        from IPython.display import display, Math
+        def inner(*args):
+            display(Math(rf'[\text{{giancarlo}}] : {" ".join(str(a) for a in args)}'))
+        return inner
+    def inner(*args):
+        builtins.print(rf'[\text{{giancarlo}}] : {" ".join(str(a) for a in args)}')
+    return inner
+    
+print = init_printer()
