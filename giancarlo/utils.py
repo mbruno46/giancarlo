@@ -36,7 +36,7 @@ class default:
         'lorentz': True,
         'color': True,
     }
-    # debug = [] #'wick', 'simplify']
+    debug = [] #'wick', 'simplify']
     latex = inside_ipython()
 
     @classmethod
